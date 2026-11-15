@@ -2,7 +2,9 @@
 
 A private, modular personal finance dashboard with an AI assistant. See the [design](docs/superpowers/specs/2026-11-15-finnance-design.md) for the full vision and roadmap.
 
-**Status:** Phase 0 (foundation): sign-in with optional two-factor, responsive app shell, installable on phones.
+**Status:** Phase 1a (getting files in): accounts with a tracking start date, multi-file import of UFCU/Ally/CSV/Excel/OFX exports with duplicate and pending handling, and a Transactions page. Built on Phase 0: private sign-in with two-factor, installable on phones.
+
+Conventions every change follows: [docs/conventions.md](docs/conventions.md).
 
 ## Stack
 

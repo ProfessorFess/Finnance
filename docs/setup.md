@@ -95,3 +95,17 @@ Preview deployments skip database migrations until you confirm each one really g
 After your first preview deployment (from a pull request), open the Neon console from **Storage** and check there's a branch named after the preview (e.g. `preview/…`). If there is, add `MIGRATE_PREVIEWS` = `true` for the **Preview** environment only.
 
 ✅ The next preview build log shows `[vercel-build] migrations: yes`.
+
+## 10. Your first import
+
+Do this once you're ready to start tracking, ideally right after the payday you're starting from.
+
+1. **Accounts → When does tracking start?** Pick that payday and choose **Save start date**.
+2. **Add account** four times: **UFCU Checking**, **UFCU Savings**, **Ally Spending** (type: Checking), and **Ally Savings**. Set each one's bank (UFCU or Ally) and its balance **at the start of that day**, which is the bank's balance at the end of the day before.
+3. **Download a CSV from each account** on the bank's website, covering at least your start date through today. Longer is fine, since Finnance skips anything earlier.
+4. **Import → Choose files**, and pick all four at once. Each file shows its bank format and the account it'll go into; check those, then choose **Import 4 files**.
+5. **Accounts:** compare each balance with your bank app. They should match, apart from any pending transactions (Finnance brings those in once they post).
+
+✅ Four balances match your banks, and **Transactions** shows everything since your start date.
+
+From then on: download new CSVs whenever you like (weekly or monthly) and drop them all into **Import**. Overlapping dates are fine, since anything already imported is skipped.
