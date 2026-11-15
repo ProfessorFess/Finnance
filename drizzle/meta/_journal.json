@@ -8,6 +8,13 @@
       "when": 1794731257131,
       "tag": "0000_skinny_the_executioner",
       "breakpoints": true
+    },
+    {
+      "idx": 1,
+      "version": "7",
+      "when": 1794779304309,
+      "tag": "0001_nebulous_mongu",
+      "breakpoints": true
     }
   ]
 }
