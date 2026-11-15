@@ -20,7 +20,10 @@ export async function createOwner(
     throw new Error("A user with this email already exists");
   }
 
-  const user = await ctx.internalAdapter.createUser({ name: input.name.trim(), email, emailVerified: true });
+  const user = await ctx.internalAdapter.createUser(
+    { name: input.name.trim(), email, emailVerified: true },
+    { method: "admin" },
+  );
   await ctx.internalAdapter.linkAccount({
     userId: user.id,
     providerId: "credential",
