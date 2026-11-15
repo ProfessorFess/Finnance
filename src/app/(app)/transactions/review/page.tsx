@@ -11,7 +11,8 @@ import { listTransactions } from "@/server/finance/transactions";
 export const metadata = { title: "Review · Finnance" };
 
 /** Categories people reach for most, as quick picks when Finnance has no guess. */
-const POPULAR = ["Restaurants", "Groceries", "Coffee", "Shopping", "Gas & fuel", "Subscriptions", "Paycheck"];
+const POPULAR_OUT = ["Restaurants", "Groceries", "Coffee", "Shopping", "Gas & fuel", "Subscriptions"];
+const POPULAR_IN = ["Paycheck", "Refunds", "Interest", "Other income"];
 
 export default async function ReviewPage() {
   const user = await requireUser();
@@ -22,7 +23,8 @@ export default async function ReviewPage() {
     countUnsorted(db, user.id),
   ]);
   const options = categories.map((c) => ({ id: c.id, name: c.name, groupName: c.groupName }));
-  const popular = POPULAR.map((n) => categories.find((c) => c.name === n)?.id).filter((id): id is string => Boolean(id));
+  const ids = (names: string[]) => names.map((n) => categories.find((c) => c.name === n)?.id).filter((id): id is string => Boolean(id));
+  const popular = { out: ids(POPULAR_OUT), in: ids(POPULAR_IN) };
 
   return (
     <div className="rise mx-auto max-w-xl">

@@ -28,7 +28,7 @@ export function ReviewDeck({
 }: {
   rows: TransactionRow[];
   categories: CategoryOption[];
-  popular: string[];
+  popular: { out: string[]; in: string[] };
   unsorted: number;
 }) {
   const router = useRouter();
@@ -43,7 +43,8 @@ export function ReviewDeck({
   const position = done + skipped.size + 1;
 
   const quickPicks = useMemo(() => {
-    const ids = [current?.categoryId, ...popular].filter((id): id is string => Boolean(id));
+    const likely = current && current.amountCents > 0 ? popular.in : popular.out;
+    const ids = [current?.categoryId, ...likely].filter((id): id is string => Boolean(id));
     return [...new Set(ids)].slice(0, 6).map((id) => categories.find((c) => c.id === id)).filter(Boolean) as CategoryOption[];
   }, [current, popular, categories]);
 

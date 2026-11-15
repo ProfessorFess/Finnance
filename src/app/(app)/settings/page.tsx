@@ -1,11 +1,15 @@
-import { ChevronRight, ShieldCheck, SlidersHorizontal, Sparkles, Tags } from "lucide-react";
+import { ChevronRight, type LucideIcon, ShieldCheck, SlidersHorizontal, Sparkles, Tags } from "lucide-react";
 import Link from "next/link";
 import { PageHeader } from "@/components/empty-state";
 
 export const metadata = { title: "Settings · Finnance" };
 
+const sections: { href: string; icon: LucideIcon; label: string; description: string }[] = [
+  { href: "/settings/security", icon: ShieldCheck, label: "Security", description: "Two-factor authentication and backup codes" },
+  { href: "/settings/rules", icon: Tags, label: "Categories & rules", description: "How Finnance sorts your transactions" },
+];
+
 const later = [
-  { icon: Tags, label: "Categories & rules" },
   { icon: SlidersHorizontal, label: "Preferences" },
   { icon: Sparkles, label: "Assistant" },
 ];
@@ -15,16 +19,18 @@ export default function SettingsPage() {
     <div className="rise">
       <PageHeader title="Settings" />
       <section className="overflow-hidden rounded-2xl border bg-card shadow-xs">
-        <Link href="/settings/security" className="flex items-center gap-4 px-5 py-4 transition-colors hover:bg-accent">
-          <div className="grid size-10 place-items-center rounded-xl bg-primary/10 text-primary">
-            <ShieldCheck className="size-5" />
-          </div>
-          <div className="flex-1">
-            <p className="font-medium">Security</p>
-            <p className="text-sm text-muted-foreground">Two-factor authentication and backup codes</p>
-          </div>
-          <ChevronRight className="size-4 text-muted-foreground" />
-        </Link>
+        {sections.map(({ href, icon: Icon, label, description }) => (
+          <Link key={href} href={href} className="flex items-center gap-4 border-b px-5 py-4 transition-colors last:border-b-0 hover:bg-accent">
+            <div className="grid size-10 place-items-center rounded-xl bg-primary/10 text-primary">
+              <Icon className="size-5" />
+            </div>
+            <div className="flex-1">
+              <p className="font-medium">{label}</p>
+              <p className="text-sm text-muted-foreground">{description}</p>
+            </div>
+            <ChevronRight className="size-4 text-muted-foreground" />
+          </Link>
+        ))}
       </section>
       <section className="mt-6 overflow-hidden rounded-2xl border border-dashed">
         {later.map(({ icon: Icon, label }) => (
