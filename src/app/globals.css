@@ -1,26 +1,166 @@
 @import "tailwindcss";
+@import "tw-animate-css";
+@import "shadcn/tailwind.css";
 
-:root {
-  --background: #ffffff;
-  --foreground: #171717;
-}
+@custom-variant dark (&:is(.dark *));
 
+/*
+ * Finnance design tokens.
+ * Calm, private-banking feel: warm paper neutrals, one ink-navy accent (primary).
+ * `positive` is reserved for money in; `destructive` only for problems.
+ */
 @theme inline {
   --color-background: var(--background);
   --color-foreground: var(--foreground);
-  --font-sans: var(--font-geist-sans);
-  --font-mono: var(--font-geist-mono);
+  --font-sans: var(--font-body);
+  --font-heading: var(--font-display);
+  --font-mono: var(--font-body);
+  --color-ring: var(--ring);
+  --color-input: var(--input);
+  --color-border: var(--border);
+  --color-destructive: var(--destructive);
+  --color-positive: var(--positive);
+  --color-accent-foreground: var(--accent-foreground);
+  --color-accent: var(--accent);
+  --color-muted-foreground: var(--muted-foreground);
+  --color-muted: var(--muted);
+  --color-secondary-foreground: var(--secondary-foreground);
+  --color-secondary: var(--secondary);
+  --color-primary-foreground: var(--primary-foreground);
+  --color-primary: var(--primary);
+  --color-popover-foreground: var(--popover-foreground);
+  --color-popover: var(--popover);
+  --color-card-foreground: var(--card-foreground);
+  --color-card: var(--card);
+  --color-surface: var(--surface);
+  --radius-sm: calc(var(--radius) * 0.6);
+  --radius-md: calc(var(--radius) * 0.8);
+  --radius-lg: var(--radius);
+  --radius-xl: calc(var(--radius) * 1.4);
+  --radius-2xl: calc(var(--radius) * 1.8);
+  --radius-3xl: calc(var(--radius) * 2.2);
+  --radius-4xl: calc(var(--radius) * 2.6);
 }
 
-@media (prefers-color-scheme: dark) {
-  :root {
-    --background: #0a0a0a;
-    --foreground: #ededed;
+:root {
+  --background: oklch(0.972 0.006 85);
+  --surface: oklch(0.955 0.008 85);
+  --foreground: oklch(0.2 0.012 260);
+  --card: oklch(0.993 0.003 85);
+  --card-foreground: oklch(0.2 0.012 260);
+  --popover: oklch(0.993 0.003 85);
+  --popover-foreground: oklch(0.2 0.012 260);
+  --primary: oklch(0.33 0.07 258);
+  --primary-foreground: oklch(0.975 0.006 85);
+  --secondary: oklch(0.935 0.01 85);
+  --secondary-foreground: oklch(0.25 0.015 260);
+  --muted: oklch(0.935 0.01 85);
+  --muted-foreground: oklch(0.5 0.012 260);
+  --accent: oklch(0.925 0.014 85);
+  --accent-foreground: oklch(0.22 0.015 260);
+  --positive: oklch(0.52 0.12 155);
+  --destructive: oklch(0.55 0.2 27);
+  --border: oklch(0.9 0.012 85);
+  --input: oklch(0.88 0.012 85);
+  --ring: oklch(0.33 0.07 258 / 45%);
+  --radius: 0.7rem;
+  --grain-opacity: 0.035;
+}
+
+.dark {
+  --background: oklch(0.17 0.008 260);
+  --surface: oklch(0.2 0.009 260);
+  --foreground: oklch(0.94 0.008 85);
+  --card: oklch(0.215 0.01 260);
+  --card-foreground: oklch(0.94 0.008 85);
+  --popover: oklch(0.23 0.01 260);
+  --popover-foreground: oklch(0.94 0.008 85);
+  --primary: oklch(0.74 0.09 255);
+  --primary-foreground: oklch(0.17 0.02 260);
+  --secondary: oklch(0.26 0.01 260);
+  --secondary-foreground: oklch(0.94 0.008 85);
+  --muted: oklch(0.26 0.01 260);
+  --muted-foreground: oklch(0.68 0.01 260);
+  --accent: oklch(0.27 0.012 260);
+  --accent-foreground: oklch(0.94 0.008 85);
+  --positive: oklch(0.74 0.13 158);
+  --destructive: oklch(0.7 0.17 25);
+  --border: oklch(1 0 0 / 9%);
+  --input: oklch(1 0 0 / 14%);
+  --ring: oklch(0.74 0.09 255 / 50%);
+  --grain-opacity: 0.05;
+}
+
+@layer base {
+  * {
+    @apply border-border outline-ring/50;
+  }
+  html {
+    @apply font-sans;
+    -webkit-tap-highlight-color: transparent;
+  }
+  body {
+    @apply bg-background text-foreground antialiased;
+    font-feature-settings: "ss01";
+  }
+  /* Fine paper grain for depth; sits under everything, ignores pointer. */
+  body::before {
+    content: "";
+    position: fixed;
+    inset: 0;
+    z-index: 0;
+    pointer-events: none;
+    opacity: var(--grain-opacity);
+    background-image: url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' width='160' height='160'%3E%3Cfilter id='n'%3E%3CfeTurbulence type='fractalNoise' baseFrequency='0.9' numOctaves='2' stitchTiles='stitch'/%3E%3C/filter%3E%3Crect width='100%25' height='100%25' filter='url(%23n)'/%3E%3C/svg%3E");
+  }
+  button:not(:disabled),
+  [role="button"]:not(:disabled) {
+    cursor: pointer;
+  }
+  h1,
+  h2,
+  h3 {
+    font-family: var(--font-heading);
+    letter-spacing: -0.015em;
   }
 }
 
-body {
-  background: var(--background);
-  color: var(--foreground);
-  font-family: Arial, Helvetica, sans-serif;
+@layer utilities {
+  /* Money and other figures: tabular, lining numerals so columns line up. */
+  .num {
+    font-variant-numeric: tabular-nums lining-nums;
+  }
+  .pb-safe {
+    padding-bottom: env(safe-area-inset-bottom);
+  }
+  /* One orchestrated entrance per page: children rise in sequence. */
+  .rise > * {
+    animation: rise 0.55s cubic-bezier(0.2, 0.7, 0.2, 1) both;
+  }
+  .rise > *:nth-child(2) {
+    animation-delay: 70ms;
+  }
+  .rise > *:nth-child(3) {
+    animation-delay: 140ms;
+  }
+  .rise > *:nth-child(4) {
+    animation-delay: 210ms;
+  }
+}
+
+@keyframes rise {
+  from {
+    opacity: 0;
+    transform: translateY(8px);
+  }
+  to {
+    opacity: 1;
+    transform: none;
+  }
+}
+
+@media (prefers-reduced-motion: reduce) {
+  .rise > * {
+    animation: none;
+  }
 }
