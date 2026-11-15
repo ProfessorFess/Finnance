@@ -68,6 +68,13 @@ test("theme toggle switches to dark and persists", async ({ page, isMobile }) =>
   await expect(page.locator("html")).toHaveClass(/dark/);
 });
 
+test("sends security headers", async ({ request }) => {
+  const res = await request.get("/sign-in");
+  expect(res.headers()["content-security-policy"]).toContain("frame-ancestors 'none'");
+  expect(res.headers()["x-content-type-options"]).toBe("nosniff");
+  expect(res.headers()["referrer-policy"]).toBe("strict-origin-when-cross-origin");
+});
+
 test("serves an installable manifest", async ({ request }) => {
   const m = await (await request.get("/manifest.webmanifest")).json();
   expect(m).toMatchObject({ name: "Finnance", short_name: "Finnance", display: "standalone", start_url: "/" });

@@ -41,7 +41,7 @@ jobs:
           --health-timeout 3s
           --health-retries 20
     env:
-      DATABASE_URL: postgres://finnance:finnance@localhost:5432/finnance
+      E2E_DATABASE_URL: postgres://finnance:finnance@localhost:5432/finnance
       # Test-only value; never used outside CI.
       BETTER_AUTH_SECRET: ci-only-secret-not-for-production-use-000001
       BETTER_AUTH_URL: http://localhost:3100

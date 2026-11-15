@@ -36,6 +36,10 @@ describe("createOwner", () => {
     await expect(createOwner(auth, { ...input, password: "short-pass1" })).rejects.toThrow(/at least 12/);
   });
 
+  it("refuses passwords longer than 128 characters", async () => {
+    await expect(createOwner(auth, { ...input, password: "x".repeat(129) })).rejects.toThrow(/at most 128/);
+  });
+
   it("works with only the database: a login made without the app's secret signs in to the real app", async () => {
     // The CLI can't read Vercel's "Sensitive" BETTER_AUTH_SECRET, so it must not need it.
     await createOwner(createOwnerAuth(t.db), input);

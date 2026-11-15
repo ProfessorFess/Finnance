@@ -3,6 +3,7 @@ import type { Database } from "@/server/db/types";
 import { createAuth, type Auth } from "./auth";
 
 const MIN_PASSWORD_LENGTH = 12;
+const MAX_PASSWORD_LENGTH = 128; // Better Auth rejects longer passwords at sign-in
 
 /**
  * An auth instance good enough for creating logins, built from the database alone.
@@ -46,6 +47,9 @@ export async function createOwner(
   const email = input.email.trim().toLowerCase();
   if (input.password.length < MIN_PASSWORD_LENGTH) {
     throw new Error(`Password must be at least ${MIN_PASSWORD_LENGTH} characters`);
+  }
+  if (input.password.length > MAX_PASSWORD_LENGTH) {
+    throw new Error(`Password must be at most ${MAX_PASSWORD_LENGTH} characters`);
   }
 
   const ctx = await auth.$context;

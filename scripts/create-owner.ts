@@ -33,9 +33,9 @@ async function main() {
     const name = await input({ message: "Your name:", required: true });
     const email = await input({ message: "Email:", required: true });
     const pw = await password({
-      message: "Password (12+ characters):",
+      message: "Password (12–128 characters):",
       mask: true,
-      validate: (v) => v.length >= 12 || "Use at least 12 characters",
+      validate: (v) => (v.length >= 12 && v.length <= 128) || "Use 12 to 128 characters",
     });
     const confirm = await password({ message: "Confirm password:", mask: true });
     if (pw !== confirm) throw new Error("Passwords don't match");
