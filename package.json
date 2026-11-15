@@ -14,9 +14,11 @@
     "db:migrate": "drizzle-kit migrate",
     "create-owner": "tsx scripts/create-owner.ts",
     "test:e2e": "playwright test",
-    "vercel-build": "tsx scripts/vercel-build.ts"
+    "vercel-build": "tsx scripts/vercel-build.ts",
+    "ai:smoke": "tsx scripts/ai-smoke.ts"
   },
   "dependencies": {
+    "@anthropic-ai/sdk": "^1.8.0",
     "@vercel/functions": "^3.11.3",
     "better-auth": "1.7.25",
     "class-variance-authority": "^0.7.1",
