@@ -21,7 +21,7 @@ export const PRESETS: Record<PresetId, { label: string; institution: string; sig
     mapping: {
       date: { column: "Book date", format: "MM/DD/YYYY" },
       description: "Description",
-      amount: { kind: "indicator", column: "Amount", indicatorColumn: "Credit/debit indicator", debitValues: ["Debit"] },
+      amount: { kind: "indicator", column: "Amount", indicatorColumn: "Credit/debit indicator", debitValues: ["Debit"], creditValues: ["Credit"] },
       pending: { column: "Transaction type", values: ["Pending"] },
       bankCategory: "Category",
       accountNumber: "Account number(BBAN)",

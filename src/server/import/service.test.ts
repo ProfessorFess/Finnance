@@ -120,6 +120,35 @@ it("requires a mapping for an unrecognized layout", async () => {
   await expect(commitImport(t.db, A, { file, accountId: checking.id })).rejects.toThrow(/columns/);
 });
 
+it("stores a cleaned-up merchant on imported rows", async () => {
+  await commitImport(t.db, A, { file: ally(), accountId: spending.id });
+  const rows = await t.db.select().from(transactions).where(eq(transactions.accountId, spending.id));
+  expect(rows.find((r) => r.rawDescription.startsWith("CORNER STORE"))!.merchant).toBe("Corner Store");
+});
+
+it("adds only the new identical row when a later file has one more same-day coffee", async () => {
+  const header = "Date, Time, Amount, Type, Description";
+  const oneCoffee = [header, "2026-11-13,08:00:00,-6.25,Withdrawal,Bennu Coffee"].join("\n");
+  const twoCoffees = [header, "2026-11-13,08:00:00,-6.25,Withdrawal,Bennu Coffee", "2026-11-13,15:00:00,-6.25,Withdrawal,Bennu Coffee"].join("\n");
+  const file = (text: string) => ({ name: "ally_spending.csv", bytes: new TextEncoder().encode(text) });
+  expect((await commitImport(t.db, A, { file: file(oneCoffee), accountId: spending.id })).imported).toBe(1);
+  expect(await commitImport(t.db, A, { file: file(twoCoffees), accountId: spending.id })).toMatchObject({ imported: 1, duplicates: 1 });
+});
+
+it("includes rows dated exactly on the start date", async () => {
+  await setTrackingStartDate(t.db, A, "2026-11-12");
+  const r = await commitImport(t.db, A, { file: ufcu(), accountId: checking.id });
+  expect(r).toMatchObject({ imported: 5, beforeStart: 1 });
+  const rows = await t.db.select().from(transactions).where(eq(transactions.date, "2026-11-12"));
+  expect(rows).toHaveLength(1);
+});
+
+it("re-imports cleanly after an undo", async () => {
+  const first = await commitImport(t.db, A, { file: ufcu(), accountId: checking.id });
+  await undoImport(t.db, A, first.batchId);
+  expect((await commitImport(t.db, A, { file: ufcu(), accountId: checking.id })).imported).toBe(5);
+});
+
 it("requires a tracking start date", async () => {
   await expect(previewImport(t.db, B, ufcu())).rejects.toThrow(/start date/);
 });

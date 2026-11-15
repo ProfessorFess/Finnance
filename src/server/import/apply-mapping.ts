@@ -62,8 +62,11 @@ function readAmount(mapping: ColumnMapping, get: (col: string) => string): { cen
   if (a.kind === "indicator") {
     const cents = parseAmountToCents(get(a.column));
     if (cents === null) return bad(a.column);
-    const isDebit = a.debitValues.some((v) => v.toLowerCase() === get(a.indicatorColumn).toLowerCase());
-    return { cents: isDebit ? -Math.abs(cents) : Math.abs(cents) };
+    const indicator = get(a.indicatorColumn).toLowerCase();
+    const credits = (a.creditValues ?? ["credit", "cr"]).map((v) => v.toLowerCase());
+    if (a.debitValues.some((v) => v.toLowerCase() === indicator)) return { cents: -Math.abs(cents) };
+    if (credits.includes(indicator)) return { cents: Math.abs(cents) };
+    return { error: `Amount: "${get(a.indicatorColumn)}" in column "${a.indicatorColumn}" isn't a debit or credit` };
   }
   // Many banks write 0.00 in the unused column, so "present" means non-zero.
   const read = (col: string): number | null | "bad" => {

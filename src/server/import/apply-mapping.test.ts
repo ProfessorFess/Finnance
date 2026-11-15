@@ -66,3 +66,25 @@ it("flags rows whose column count doesn't match the header", () => {
   expect(rows).toHaveLength(1);
   expect(errors).toEqual([{ line: 3, reason: expect.stringMatching(/2 columns.*expected 3/) }]);
 });
+
+it("reports a blank or unknown debit/credit indicator instead of treating it as money in", () => {
+  const table = {
+    headers: ["Date", "Description", "Amount", "Indicator"],
+    rows: [
+      ["2026-11-10", "Fine", "5.00", "Credit"],
+      ["2026-11-11", "Blank", "5.00", ""],
+      ["2026-11-12", "Odd", "5.00", "Reversal"],
+    ],
+    lines: [2, 3, 4],
+  };
+  const { rows, errors } = applyMapping(table, {
+    date: { column: "Date", format: "YYYY-MM-DD" },
+    description: "Description",
+    amount: { kind: "indicator", column: "Amount", indicatorColumn: "Indicator", debitValues: ["Debit"] },
+  });
+  expect(rows.map((r) => r.amountCents)).toEqual([500]);
+  expect(errors).toEqual([
+    { line: 3, reason: expect.stringMatching(/Indicator/) },
+    { line: 4, reason: expect.stringMatching(/Indicator/) },
+  ]);
+});

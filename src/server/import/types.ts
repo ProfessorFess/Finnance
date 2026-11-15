@@ -5,7 +5,7 @@ export type { DateFormat };
 /** How a file says which way money moved. */
 export type AmountMapping =
   | { kind: "signed"; column: string; invert?: boolean }
-  | { kind: "indicator"; column: string; indicatorColumn: string; debitValues: string[] }
+  | { kind: "indicator"; column: string; indicatorColumn: string; debitValues: string[]; creditValues?: string[] }
   | { kind: "split"; debitColumn: string; creditColumn: string };
 
 /** Which columns hold what, by header name. Saved per bank layout as an import profile. */

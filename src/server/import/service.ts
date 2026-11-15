@@ -4,6 +4,7 @@ import type { Database } from "@/server/db/types";
 import { logActivity } from "@/server/finance/activity";
 import { NotFoundError } from "@/server/finance/errors";
 import { getSettings } from "@/server/finance/settings";
+import { normalizeMerchant } from "@/server/categorize/normalize-merchant";
 import { assignOccurrences, dedupeHash } from "./dedupe";
 import { headerSignature } from "./detect";
 import { ImportError } from "./errors";
@@ -183,6 +184,7 @@ export async function commitImport(
     date: r.date,
     amountCents: r.amountCents,
     rawDescription: r.description,
+    merchant: normalizeMerchant(r.description),
     source: parsed.source,
     externalId: r.externalId,
     dedupeHash: dedupeHash(account.id, r, r.occurrence),

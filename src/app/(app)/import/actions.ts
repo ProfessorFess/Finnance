@@ -17,7 +17,7 @@ const mappingSchema: z.ZodType<ColumnMapping> = z.object({
   description: z.string(),
   amount: z.discriminatedUnion("kind", [
     z.object({ kind: z.literal("signed"), column: z.string(), invert: z.boolean().optional() }),
-    z.object({ kind: z.literal("indicator"), column: z.string(), indicatorColumn: z.string(), debitValues: z.array(z.string()) }),
+    z.object({ kind: z.literal("indicator"), column: z.string(), indicatorColumn: z.string(), debitValues: z.array(z.string()), creditValues: z.array(z.string()).optional() }),
     z.object({ kind: z.literal("split"), debitColumn: z.string(), creditColumn: z.string() }),
   ]),
   pending: z.object({ column: z.string(), values: z.array(z.string()) }).optional(),
