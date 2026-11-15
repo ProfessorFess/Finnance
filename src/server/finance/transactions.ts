@@ -73,7 +73,12 @@ async function getRow(db: Executor, userId: string, id: string) {
   return row;
 }
 
-const toRow = ({ createdAt: _createdAt, ...r }: Awaited<ReturnType<typeof getRow>>): TransactionRow => r;
+/** Drops the cursor-only `createdAt` field. */
+function toRow(r: Awaited<ReturnType<typeof getRow>>): TransactionRow {
+  const { createdAt, ...row } = r;
+  void createdAt;
+  return row;
+}
 
 async function assertCategory(db: Executor, userId: string, categoryId: string | null | undefined) {
   if (!categoryId) return;
