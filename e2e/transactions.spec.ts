@@ -31,12 +31,12 @@ test("categorizes one transaction inline", async ({ page, isMobile }) => {
   test.skip(isMobile);
   await page.goto("/sign-in?next=/transactions");
   await signIn(page, TXN_USER);
-  const row = page.getByRole("listitem").filter({ hasText: "Prime Video" });
+  const row = page.getByRole("listitem").filter({ hasText: "Payroll Acme Corp" });
   await row.getByRole("button", { name: /Category: Uncategorized/ }).click();
-  await page.getByRole("menuitem", { name: "Subscriptions" }).click();
-  await expect(row.getByRole("button", { name: /Category: Subscriptions/ })).toBeVisible();
+  await page.getByRole("menuitem", { name: "Paycheck" }).click();
+  await expect(row.getByRole("button", { name: /Category: Paycheck/ })).toBeVisible();
   await page.reload();
-  await expect(page.getByRole("listitem").filter({ hasText: "Prime Video" }).getByRole("button", { name: /Category: Subscriptions/ })).toBeVisible();
+  await expect(page.getByRole("listitem").filter({ hasText: "Payroll Acme Corp" }).getByRole("button", { name: /Category: Paycheck/ })).toBeVisible();
 });
 
 test("hides a duplicate and can bring it back", async ({ page, isMobile }) => {

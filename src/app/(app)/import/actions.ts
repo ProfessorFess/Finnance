@@ -2,6 +2,7 @@
 
 import { revalidatePath } from "next/cache";
 import { z } from "zod";
+import { getAiCategorizer } from "@/server/ai";
 import { requireUser } from "@/server/auth/session";
 import { getDb } from "@/server/db/client";
 import { NotFoundError, ValidationError } from "@/server/finance/errors";
@@ -65,7 +66,7 @@ export async function importFile(formData: FormData): Promise<ImportResult | Fai
       file: await readFile(formData),
       accountId,
       mapping: readMapping(formData),
-    });
+    }, { ai: getAiCategorizer() });
     revalidatePath("/import");
     revalidatePath("/transactions");
     revalidatePath("/accounts");

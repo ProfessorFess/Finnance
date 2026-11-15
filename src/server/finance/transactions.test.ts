@@ -51,7 +51,8 @@ it("searches descriptions case-insensitively and literally", async () => {
 it("filters by date range, account, and uncategorized", async () => {
   expect((await listTransactions(t.db, A, { from: "2026-11-13", to: "2026-11-13" })).items).toHaveLength(2);
   expect((await listTransactions(t.db, A, { accountId: checking.id })).items).toHaveLength(5);
-  expect((await listTransactions(t.db, A, { categoryId: "uncategorized" })).items).toHaveLength(5);
+  // Prime Video is sorted by a built-in rule on import (Phase 1b), so 4 remain.
+  expect((await listTransactions(t.db, A, { categoryId: "uncategorized" })).items).toHaveLength(4);
 });
 
 it("paginates with a cursor", async () => {
@@ -114,6 +115,12 @@ it("unhides a row", async () => {
   await setHidden(t.db, A, row!.id, false);
   expect((await listTransactions(t.db, A, {})).items).toHaveLength(5);
   await expect(setHidden(t.db, B, row!.id, true)).rejects.toThrow(NotFoundError);
+});
+
+it("filters to rows that need review", async () => {
+  const { items } = await listTransactions(t.db, A, { needsReview: true });
+  expect(items.length).toBeGreaterThan(0);
+  expect(items.every((i) => i.needsReview)).toBe(true);
 });
 
 it("adds a manual cash transaction and records it", async () => {

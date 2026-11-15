@@ -7,7 +7,9 @@ import { setTrackingStartDate } from "@/server/finance/settings";
 import { createTestDb } from "@/test/db";
 import { fixtureBytes } from "@/test/fixtures";
 import { createTestUser } from "@/test/users";
+import type { AiCategorizer } from "@/server/categorize/ai-categorizer";
 import { detectTransfers } from "@/server/categorize/transfers-service";
+import { listCategories } from "@/server/finance/categories";
 import { commitImport, previewImport, undoImport } from "./service";
 
 let t: Awaited<ReturnType<typeof createTestDb>>;
@@ -154,10 +156,31 @@ it("undoing one side of a transfer un-pairs the other side", async () => {
   const savings = await createAccount(t.db, A, { name: "UFCU Savings", type: "savings", institution: "UFCU", startingBalanceCents: 0 });
   await commitImport(t.db, A, { file: ufcu(), accountId: checking.id });
   const sav = await commitImport(t.db, A, { file: { name: "UFCU_Savings_Account.csv", bytes: fixtureBytes("ufcu-savings.csv") }, accountId: savings.id });
-  expect(await detectTransfers(t.db, A)).toBe(1);
+  expect(sav.transfers).toBe(1); // imports pair transfers themselves now
+  expect(await detectTransfers(t.db, A)).toBe(0);
   await undoImport(t.db, A, sav.batchId);
   const [checkingSide] = await t.db.select().from(transactions).where(eq(transactions.rawDescription, "Withdrawal Internet Banking Transfer To Share 0001 Savings"));
   expect(checkingSide).toMatchObject({ transferPairId: null, needsReview: true, categoryId: null });
+});
+
+it("an AI failure leaves rows for review and the import succeeds", async () => {
+  const boom: AiCategorizer = async () => {
+    throw new Error("network down");
+  };
+  const r = await commitImport(t.db, A, { file: ufcu(), accountId: checking.id }, { ai: boom });
+  expect(r.imported).toBe(5);
+  expect(r.needsReview).toBeGreaterThan(0);
+});
+
+it("pairs transfers and categorizes as part of the import", async () => {
+  const savings = await createAccount(t.db, A, { name: "UFCU Savings", type: "savings", institution: "UFCU", startingBalanceCents: 0 });
+  const first = await commitImport(t.db, A, { file: ufcu(), accountId: checking.id }, { ai: null });
+  expect(first.transfers).toBe(0);
+  const second = await commitImport(t.db, A, { file: { name: "UFCU_Savings_Account.csv", bytes: fixtureBytes("ufcu-savings.csv") }, accountId: savings.id }, { ai: null });
+  expect(second.transfers).toBe(1);
+  const subscriptions = (await listCategories(t.db, A)).find((c) => c.name === "Subscriptions")!;
+  const [prime] = await t.db.select().from(transactions).where(eq(transactions.rawDescription, "Prime Video"));
+  expect(prime).toMatchObject({ categoryId: subscriptions.id, categorizationSource: "rule" });
 });
 
 it("requires a tracking start date", async () => {

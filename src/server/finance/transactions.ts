@@ -1,7 +1,7 @@
 import { randomUUID } from "node:crypto";
 import { and, desc, eq, gte, ilike, inArray, isNull, lte, ne, or, type SQL, sql } from "drizzle-orm";
 import { formatDisplayDate, parseDateValue } from "@/lib/dates";
-import { accounts, categories, type TransactionSource, transactions } from "@/server/db/schema";
+import { accounts, type CategorizationSource, categories, type TransactionSource, transactions } from "@/server/db/schema";
 import type { Database, Executor } from "@/server/db/types";
 import { type ActivityEntry, listActivity, logActivity } from "./activity";
 import { NotFoundError, ValidationError } from "./errors";
@@ -17,6 +17,8 @@ export type TransactionFilters = {
   limit?: number;
   /** Include rows hidden as duplicates (status "excluded"). */
   includeHidden?: boolean;
+  /** Only rows Finnance wasn't sure about. */
+  needsReview?: boolean;
 };
 
 /** Status of a row the user hid as a duplicate: kept (so re-imports still skip it) but not counted. */
@@ -35,6 +37,11 @@ export type TransactionRow = {
   source: TransactionSource;
   status: string;
   hidden: boolean;
+  merchant: string | null;
+  categorizationSource: CategorizationSource | null;
+  categorizationConfidence: number | null;
+  needsReview: boolean;
+  transferPairId: string | null;
 };
 
 type Cursor = { date: string; createdAt: string; id: string };
@@ -64,6 +71,11 @@ const rowSelect = {
   notes: transactions.notes,
   source: transactions.source,
   status: transactions.status,
+  merchant: transactions.merchant,
+  categorizationSource: transactions.categorizationSource,
+  categorizationConfidence: transactions.categorizationConfidence,
+  needsReview: transactions.needsReview,
+  transferPairId: transactions.transferPairId,
   // Exact text from Postgres (microseconds, no timezone conversion) for the cursor;
   // a JS Date would round to milliseconds and drift with the server's timezone.
   createdAt: sql<string>`${transactions.createdAt}::text`,
@@ -108,6 +120,7 @@ export async function listTransactions(
   const startDate = await getTrackingStartDate(db, userId);
   if (startDate) where.push(gte(transactions.date, startDate));
   if (!f.includeHidden) where.push(ne(transactions.status, HIDDEN_STATUS));
+  if (f.needsReview) where.push(eq(transactions.needsReview, true));
   if (f.search?.trim()) {
     const q = `%${escapeLike(f.search.trim())}%`;
     where.push(or(ilike(transactions.rawDescription, q), ilike(transactions.notes, q))!);

@@ -1,11 +1,13 @@
-import { and, desc, eq, isNull } from "drizzle-orm";
+import { and, desc, eq, inArray, isNull } from "drizzle-orm";
 import { accounts, importBatches, importProfiles, transactions } from "@/server/db/schema";
 import type { Database } from "@/server/db/types";
 import { logActivity } from "@/server/finance/activity";
 import { NotFoundError } from "@/server/finance/errors";
 import { getSettings } from "@/server/finance/settings";
 import { normalizeMerchant } from "@/server/categorize/normalize-merchant";
-import { clearDanglingPairs } from "@/server/categorize/transfers-service";
+import type { AiCategorizer } from "@/server/categorize/ai-categorizer";
+import { categorizeTransactions } from "@/server/categorize/pipeline";
+import { clearDanglingPairs, detectTransfers } from "@/server/categorize/transfers-service";
 import { assignOccurrences, dedupeHash } from "./dedupe";
 import { headerSignature } from "./detect";
 import { ImportError } from "./errors";
@@ -33,6 +35,10 @@ export type ImportResult = {
   pending: number;
   beforeStart: number;
   errors: RowError[];
+  /** Transfer pairs matched after this import. */
+  transfers: number;
+  /** Imported rows that still need the user's review. */
+  needsReview: number;
 };
 export type ImportBatchSummary = {
   id: string;
@@ -168,6 +174,7 @@ export async function commitImport(
   db: Database,
   userId: string,
   input: { file: ImportFile; accountId: string; mapping?: ColumnMapping },
+  deps: { ai: AiCategorizer | null } = { ai: null },
 ): Promise<ImportResult> {
   const [account] = await db
     .select()
@@ -192,7 +199,7 @@ export async function commitImport(
     bankCategory: r.bankCategory,
   }));
 
-  return db.transaction(async (tx) => {
+  const committed = await db.transaction(async (tx) => {
     const [batch] = await tx
       .insert(importBatches)
       .values({
@@ -207,15 +214,16 @@ export async function commitImport(
       })
       .returning({ id: importBatches.id });
 
-    let imported = 0;
+    const insertedIds: string[] = [];
     for (let i = 0; i < rows.length; i += CHUNK) {
       const inserted = await tx
         .insert(transactions)
         .values(rows.slice(i, i + CHUNK).map((r) => ({ ...r, importBatchId: batch!.id })))
         .onConflictDoNothing({ target: [transactions.accountId, transactions.dedupeHash] })
         .returning({ id: transactions.id });
-      imported += inserted.length;
+      insertedIds.push(...inserted.map((x) => x.id));
     }
+    const imported = insertedIds.length;
     const duplicates = rows.length - imported;
     await tx.update(importBatches).set({ importedCount: imported, duplicateCount: duplicates }).where(eq(importBatches.id, batch!.id));
 
@@ -242,7 +250,7 @@ export async function commitImport(
       await tx.update(accounts).set({ lastFour: digits.slice(-4) }).where(eq(accounts.id, account.id));
     }
 
-    const result: ImportResult = { batchId: batch!.id, imported, duplicates, pending: counts.pending, beforeStart: counts.beforeStart, errors: parsed.errors };
+    const result = { batchId: batch!.id, imported, duplicates, pending: counts.pending, beforeStart: counts.beforeStart, errors: parsed.errors, insertedIds };
     await logActivity(tx, {
       userId,
       actor: "user",
@@ -253,6 +261,36 @@ export async function commitImport(
     });
     return result;
   });
+
+  const { insertedIds, ...result } = committed;
+  let transfers = 0;
+  if (insertedIds.length > 0) {
+    // Sorting runs after the rows are safely committed; a failure here never undoes the import.
+    const dates = rows.map((r) => r.date).sort();
+    try {
+      transfers = await detectTransfers(db, userId, { from: dates[0]!, to: dates[dates.length - 1]! });
+    } catch (err) {
+      console.error("Transfer detection failed", err instanceof Error ? err.message : err);
+    }
+    try {
+      await categorizeTransactions(db, userId, { ids: insertedIds }, { ai: deps.ai });
+    } catch (err) {
+      console.error("Categorization failed", err instanceof Error ? err.message : err);
+      await db
+        .update(transactions)
+        .set({ needsReview: true })
+        .where(and(eq(transactions.userId, userId), inArray(transactions.id, insertedIds), isNull(transactions.categorizationSource)));
+    }
+  }
+  const needsReview = insertedIds.length
+    ? (
+        await db
+          .select({ id: transactions.id })
+          .from(transactions)
+          .where(and(eq(transactions.userId, userId), inArray(transactions.id, insertedIds), eq(transactions.needsReview, true)))
+      ).length
+    : 0;
+  return { ...result, transfers, needsReview };
 }
 
 /** Removes everything one import added. */
