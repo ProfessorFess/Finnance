@@ -7,6 +7,7 @@ import {
   integer,
   jsonb,
   pgTable,
+  real,
   text,
   timestamp,
   uniqueIndex,
@@ -16,6 +17,12 @@ import { user } from "./auth-schema";
 export type AccountType = "checking" | "savings" | "credit_card" | "cash" | "loan" | "investment" | "other";
 export type CategoryKind = "expense" | "income" | "transfer";
 export type TransactionSource = "csv" | "xlsx" | "ofx" | "manual" | "ai" | "sync";
+export type CategorizationSource = "rule" | "history" | "ai" | "user" | "transfer";
+export type RuleMatchType = "merchant_equals" | "description_contains" | "regex";
+export type RuleOrigin = "user" | "correction" | "default";
+
+/** transfer_pair_id value meaning "the user said this is not a transfer". */
+export const NOT_A_TRANSFER = "none";
 
 const id = () =>
   text("id")
@@ -41,6 +48,8 @@ export const userSettings = pgTable("user_settings", {
   trackingStartDate: date("tracking_start_date", { mode: "string" }),
   timezone: text("timezone").default("America/Chicago").notNull(),
   weekStartDay: integer("week_start_day").default(1).notNull(),
+  aiMonthlyCapCents: integer("ai_monthly_cap_cents").default(1000).notNull(),
+  defaultRulesSeeded: boolean("default_rules_seeded").default(false).notNull(),
   ...timestamps,
 });
 
@@ -120,11 +129,17 @@ export const transactions = pgTable(
     dedupeHash: text("dedupe_hash").notNull(),
     status: text("status").default("cleared").notNull(),
     bankCategory: text("bank_category"),
+    categorizationSource: text("categorization_source").$type<CategorizationSource>(),
+    categorizationConfidence: real("categorization_confidence"),
+    needsReview: boolean("needs_review").default(false).notNull(),
+    /** Shared id for both sides of a transfer, or NOT_A_TRANSFER. */
+    transferPairId: text("transfer_pair_id"),
     ...timestamps,
   },
   (t) => [
     uniqueIndex("transactions_account_dedupe_idx").on(t.accountId, t.dedupeHash),
     index("transactions_user_date_idx").on(t.userId, t.date),
+    index("transactions_user_review_idx").on(t.userId, t.needsReview),
   ],
 );
 
@@ -157,4 +172,38 @@ export const activityLog = pgTable(
     createdAt: timestamp("created_at").defaultNow().notNull(),
   },
   (t) => [index("activity_log_entity_idx").on(t.userId, t.entityType, t.entityId)],
+);
+
+export const categoryRules = pgTable(
+  "category_rules",
+  {
+    id: id(),
+    userId: userId(),
+    matchType: text("match_type").$type<RuleMatchType>().notNull(),
+    pattern: text("pattern").notNull(),
+    categoryId: text("category_id")
+      .notNull()
+      .references(() => categories.id, { onDelete: "cascade" }),
+    priority: integer("priority").default(100).notNull(),
+    createdFrom: text("created_from").$type<RuleOrigin>().notNull(),
+    ...timestamps,
+  },
+  (t) => [uniqueIndex("category_rules_user_pattern_idx").on(t.userId, t.matchType, t.pattern)],
+);
+
+export const aiUsage = pgTable(
+  "ai_usage",
+  {
+    id: id(),
+    userId: userId(),
+    purpose: text("purpose").notNull(),
+    model: text("model").notNull(),
+    inputTokens: integer("input_tokens").notNull(),
+    outputTokens: integer("output_tokens").notNull(),
+    cacheReadTokens: integer("cache_read_tokens").notNull(),
+    cacheWriteTokens: integer("cache_write_tokens").notNull(),
+    costMicros: bigint("cost_micros", { mode: "number" }).notNull(),
+    createdAt: timestamp("created_at").defaultNow().notNull(),
+  },
+  (t) => [index("ai_usage_user_time_idx").on(t.userId, t.createdAt)],
 );
