@@ -109,3 +109,18 @@ Do this once you're ready to start tracking, ideally right after the payday you'
 ✅ Four balances match your banks, and **Transactions** shows everything since your start date.
 
 From then on: download new CSVs whenever you like (weekly or monthly) and drop them all into **Import**. Overlapping dates are fine, since anything already imported is skipped.
+
+## 11. Turn on AI sorting
+
+Finnance sorts most transactions with rules and your past choices. For new merchants it asks Claude Haiku, which needs an Anthropic API key. Without a key everything still works; those transactions simply wait in **Review**.
+
+1. Go to [console.anthropic.com](https://console.anthropic.com), sign in or create an account, then open **API Keys → Create Key** and name it `Finnance`. Copy the key.
+2. In the Console's **Billing**, set a monthly spend limit (for example $5). Finnance also caps itself at $10 a month; normal use is a few cents.
+3. In Vercel, open **Settings → Environment Variables** and add `ANTHROPIC_API_KEY` with your key (Production; marking it Sensitive is fine). If you run Finnance locally, add the same line to `.env.local`.
+4. Redeploy (Deployments → Redeploy).
+5. Open **Transactions → Review** and choose **Sort now** once. That sorts everything you imported before this update.
+
+✅ Most transactions show a category, moves between your UFCU and Ally accounts show **Transfer**, and **Review** holds only the ones Finnance wasn't sure about.
+
+What gets sent to Anthropic: for each new merchant, its cleaned name, the bank's description, the amount, and the bank's own category, plus a few of your past choices as examples. Nothing else.
+

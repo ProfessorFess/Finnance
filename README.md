@@ -2,7 +2,7 @@
 
 A private, modular personal finance dashboard with an AI assistant. See the [design](docs/superpowers/specs/2026-11-15-finnance-design.md) for the full vision and roadmap.
 
-**Status:** Phase 1a (getting files in): accounts with a tracking start date, multi-file import of UFCU/Ally/CSV/Excel/OFX exports with duplicate and pending handling, and a Transactions page. Built on Phase 0: private sign-in with two-factor, installable on phones.
+**Status:** Phase 1b (automatic sorting): merchant names cleaned up; transactions sorted by your rules, your past choices, then Claude Haiku; transfers between your own accounts matched; a swipeable review queue; corrections turn into rules. Built on Phase 1a (accounts, multi-file import, transactions) and Phase 0 (private sign-in with two-factor, installable on phones).
 
 Conventions every change follows: [docs/conventions.md](docs/conventions.md).
 
