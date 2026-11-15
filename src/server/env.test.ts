@@ -53,6 +53,23 @@ describe("parseEnv", () => {
     );
   });
 
+  it("uses the production alias on Vercel production when BETTER_AUTH_URL is unset", () => {
+    const env = parseEnv({
+      ...valid,
+      BETTER_AUTH_URL: undefined,
+      VERCEL_ENV: "production",
+      VERCEL_URL: "finnance-abc123.vercel.app",
+      VERCEL_PROJECT_PRODUCTION_URL: "finnance.vercel.app",
+    });
+    expect(env.authBaseUrl).toBe("https://finnance.vercel.app");
+    expect(env.trustedOrigins).toContain("https://finnance-abc123.vercel.app");
+  });
+
+  it("always trusts the production alias so sign-in works there", () => {
+    const env = parseEnv({ ...valid, VERCEL_PROJECT_PRODUCTION_URL: "finnance.vercel.app" });
+    expect(env.trustedOrigins).toContain("https://finnance.vercel.app");
+  });
+
   it("requires BETTER_AUTH_URL when not on Vercel", () => {
     expect(() => parseEnv({ ...valid, BETTER_AUTH_URL: undefined })).toThrow(/BETTER_AUTH_URL/);
   });

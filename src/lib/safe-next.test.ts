@@ -12,6 +12,11 @@ it.each([
   ["/\\evil.example", "/"],
   ["javascript:alert(1)", "/"],
   ["/sign-in", "/"],
+  ["/\t/evil.example", "/"],
+  ["/\n/evil.example", "/"],
+  ["/\r/evil.example", "/"],
+  ["/sign-in?next=/goals", "/"],
+  ["/goals#top", "/goals#top"],
 ])("safeNextPath(%j) -> %j", (input, expected) => {
   expect(safeNextPath(input)).toBe(expected);
 });

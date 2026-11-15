@@ -7,16 +7,9 @@ import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
 import { authClient } from "@/lib/auth-client";
+import { codeErrorMessage, signInErrorMessage } from "@/lib/auth-errors";
 
 type Step = "password" | "totp" | "backup";
-
-const INVALID = "Invalid email or password.";
-const TOO_MANY = "Too many attempts. Try again in a minute.";
-
-function messageFor(error: { status?: number; message?: string } | null, fallback: string) {
-  if (!error) return null;
-  return error.status === 429 ? TOO_MANY : fallback;
-}
 
 export function SignInForm({ nextPath }: { nextPath: string }) {
   const router = useRouter();
@@ -39,7 +32,7 @@ export function SignInForm({ nextPath }: { nextPath: string }) {
       password: String(form.get("password")),
     });
     setPending(false);
-    if (error) return setError(messageFor(error, INVALID));
+    if (error) return setError(signInErrorMessage(error.status));
     if (data && "twoFactorRedirect" in data && data.twoFactorRedirect) return setStep("totp");
     done();
   }
@@ -54,7 +47,7 @@ export function SignInForm({ nextPath }: { nextPath: string }) {
         ? await authClient.twoFactor.verifyTotp({ code })
         : await authClient.twoFactor.verifyBackupCode({ code });
     setPending(false);
-    if (error) return setError(messageFor(error, "That code didn't work. Try again."));
+    if (error) return setError(codeErrorMessage(error.status));
     done();
   }
 

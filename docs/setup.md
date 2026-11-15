@@ -16,7 +16,7 @@ You'll need: a GitHub account with access to `ProfessorFess/Finnance`, and this 
 
 1. In the project, open **Storage → Create Database → Neon** (from the Vercel Marketplace) and create it on the free plan.
 2. Connect it to **all environments** (Production, Preview, Development).
-3. Turn on the option to **create a database branch for each preview deployment**. This gives each preview its own copy of the database, so testing a change never touches your real data.
+3. Turn on the option to **create a database branch for each preview deployment**. Each preview then gets its own copy of the database, so trying out a change can't modify your real data. The copy still *contains* your data, though, which is why step 4 keeps previews private.
 
 ✅ **Settings → Environment Variables** now lists `DATABASE_URL` and `DATABASE_URL_UNPOOLED`.
 
@@ -28,13 +28,18 @@ In **Settings → Environment Variables**, add:
 |---|---|---|
 | `BETTER_AUTH_SECRET` | Run `openssl rand -base64 32` in Terminal and paste the result. Make a **different** one for Preview. | Production, and separately Preview |
 | `ALLOW_SIGNUP` | `false` | All |
-| `BETTER_AUTH_URL` | `https://<your-project>.vercel.app` (your production URL) | Production only |
 
-Previews work out their own URL automatically, so they don't need `BETTER_AUTH_URL`.
+You don't need `BETTER_AUTH_URL` on Vercel: Finnance uses your production address automatically. Only add it (Production only) if you later connect a custom domain, set to that domain, e.g. `https://money.example.com`.
 
-✅ Five variables are listed: the two database ones plus these three.
+✅ Four variables are listed: the two database ones plus these two.
 
-## 4. Deploy
+## 4. Keep previews private
+
+Go to **Settings → Deployment Protection** and make sure **Vercel Authentication** is on for **preview deployments** (it's on by default for new projects). This way only you, signed in to Vercel, can open a preview.
+
+✅ Vercel Authentication shows as enabled for previews.
+
+## 5. Deploy
 
 Go to **Deployments**, then click **Redeploy** on the latest one (or push to `main`). When it finishes, open:
 
@@ -42,7 +47,7 @@ Go to **Deployments**, then click **Redeploy** on the latest one (or push to `ma
 
 ✅ It shows `{"ok":true}`.
 
-## 5. Create your login
+## 6. Create your login
 
 In Terminal, in the Finnance folder:
 
@@ -66,7 +71,7 @@ rm .env.production.local
 
 ✅ The script prints `Owner created: <your email>`.
 
-## 6. Sign in on your phone and turn on two-step login
+## 7. Sign in on your phone and turn on two-step login
 
 1. Open `https://<your-project>.vercel.app` on your phone and sign in.
 2. Go to **More → Settings → Security** and tap **Enable two-factor authentication**.
@@ -74,9 +79,17 @@ rm .env.production.local
 
 ✅ Security shows "Two-factor authentication is on".
 
-## 7. Add Finnance to your home screen
+## 8. Add Finnance to your home screen
 
 - **iPhone:** Safari → Share → **Add to Home Screen**
 - **Android:** Chrome menu → **Install app**
 
 ✅ Finnance opens full-screen from its own icon.
+
+## 9. Later: let previews update their database
+
+Preview deployments skip database migrations until you confirm each one really gets its own database branch. This prevents a half-finished change from ever altering your real database.
+
+After your first preview deployment (from a pull request), open the Neon console from **Storage** and check there's a branch named after the preview (e.g. `preview/…`). If there is, add `MIGRATE_PREVIEWS` = `true` for the **Preview** environment only.
+
+✅ The next preview build log shows `[vercel-build] migrations: yes`.

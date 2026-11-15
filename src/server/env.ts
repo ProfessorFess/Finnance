@@ -19,6 +19,8 @@ const schema = z
     BETTER_AUTH_URL: optional,
     VERCEL_URL: optional,
     VERCEL_BRANCH_URL: optional,
+    VERCEL_ENV: optional,
+    VERCEL_PROJECT_PRODUCTION_URL: optional,
     ALLOW_SIGNUP: optional,
     ANTHROPIC_API_KEY: optional,
   })
@@ -38,16 +40,20 @@ export function parseEnv(source: Record<string, string | undefined>): Env {
     throw new Error(`Invalid environment: ${names.join(", ")}`);
   }
   const e = result.data;
-  const vercelOrigins = [e.VERCEL_URL, e.VERCEL_BRANCH_URL]
-    .filter((h): h is string => h !== undefined)
-    .map((h) => `https://${h}`);
-  const authBaseUrl = e.BETTER_AUTH_URL ?? vercelOrigins[0]!;
+  const https = (h: string | undefined) => (h === undefined ? undefined : `https://${h}`);
+  const productionUrl = https(e.VERCEL_PROJECT_PRODUCTION_URL);
+  const deploymentUrls = [e.VERCEL_URL, e.VERCEL_BRANCH_URL].map(https).filter((u) => u !== undefined);
+  // On Vercel production, default to the stable production alias (what the owner
+  // actually opens), not the per-deployment URL. Previews use their own URL.
+  const authBaseUrl =
+    e.BETTER_AUTH_URL ??
+    (e.VERCEL_ENV === "production" && productionUrl ? productionUrl : deploymentUrls[0]!);
 
   return {
     databaseUrl: e.DATABASE_URL,
     authSecret: e.BETTER_AUTH_SECRET,
     authBaseUrl,
-    trustedOrigins: [...new Set([authBaseUrl, ...vercelOrigins])],
+    trustedOrigins: [...new Set([authBaseUrl, ...deploymentUrls, ...(productionUrl ? [productionUrl] : [])])],
     allowSignup: e.ALLOW_SIGNUP === "true",
     anthropicApiKey: e.ANTHROPIC_API_KEY,
   };
