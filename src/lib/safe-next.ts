@@ -8,7 +8,6 @@ const PROBE_ORIGIN = "http://next.invalid";
  * Anything else, including the sign-in page itself, becomes "/".
  */
 export function safeNextPath(next: string | null | undefined): string {
-  // eslint-disable-next-line no-control-regex
   if (!next || !next.startsWith("/") || /[\u0000-\u001f\u007f\\]/.test(next)) return "/";
   let url: URL;
   try {

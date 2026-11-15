@@ -63,7 +63,9 @@ pnpm dlx vercel env pull .env.production.local --environment=production
 pnpm create-owner --env-file .env.production.local
 ```
 
-Type your name, email, and a password of 12+ characters (use your password manager). Then delete the downloaded secrets file:
+Type your name, email, and a password of 12+ characters (use your password manager). The script only uses the database address from that file. Vercel's warning that "Sensitive" values were written as `[SENSITIVE]` placeholders is expected and harmless here.
+
+Then delete the downloaded file, since it holds your database password:
 
 ```bash
 rm .env.production.local
