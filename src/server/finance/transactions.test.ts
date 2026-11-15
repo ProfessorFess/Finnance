@@ -6,7 +6,7 @@ import { commitImport } from "@/server/import/service";
 import { createTestDb } from "@/test/db";
 import { fixtureBytes } from "@/test/fixtures";
 import { createTestUser } from "@/test/users";
-import { type Account, createAccount } from "./accounts";
+import { type Account, createAccount, listAccounts } from "./accounts";
 import { listCategories } from "./categories";
 import { NotFoundError } from "./errors";
 import { setTrackingStartDate } from "./settings";
@@ -16,6 +16,7 @@ import {
   getTransactionHistory,
   listTransactions,
   setCategoryBulk,
+  setHidden,
   updateTransaction,
 } from "./transactions";
 
@@ -81,6 +82,38 @@ it("paginates rows that share a date and an insert time without skipping any", a
   } while (cursor);
   expect(new Set(seen).size).toBe(7);
   expect(seen).toHaveLength(7);
+});
+
+it("lists only transactions on or after the tracking start date", async () => {
+  await setTrackingStartDate(t.db, A, "2026-11-13");
+  const { items } = await listTransactions(t.db, A, {});
+  expect(items.map((i) => i.date)).toEqual(["2026-11-14", "2026-11-14", "2026-11-13", "2026-11-13"]);
+});
+
+it("rejects a manual transaction dated before the tracking start date", async () => {
+  await expect(
+    createManualTransaction(t.db, A, { accountId: checking.id, date: "2026-11-06", description: "Too early", amountCents: -100 }),
+  ).rejects.toThrow(/before your tracking start date/);
+});
+
+it("hides a duplicate imported row from balances and lists, and re-importing doesn't bring it back", async () => {
+  const before = (await listAccounts(t.db, A))[0]!.balanceCents;
+  const [coffee] = (await listTransactions(t.db, A, { search: "Bennu" })).items;
+  await setHidden(t.db, A, coffee!.id, true);
+  expect((await listAccounts(t.db, A))[0]!.balanceCents).toBe(before + 625);
+  expect((await listTransactions(t.db, A, { search: "Bennu" })).items).toHaveLength(1);
+  expect((await listTransactions(t.db, A, { search: "Bennu", includeHidden: true })).items.find((i) => i.id === coffee!.id)?.hidden).toBe(true);
+  await commitImport(t.db, A, { file: { name: "ufcu.csv", bytes: fixtureBytes("ufcu-checking.csv") }, accountId: checking.id });
+  expect((await listTransactions(t.db, A, { search: "Bennu" })).items).toHaveLength(1);
+  expect((await getTransactionHistory(t.db, A, coffee!.id))[0]!.action).toBe("transaction.hide");
+});
+
+it("unhides a row", async () => {
+  const [row] = (await listTransactions(t.db, A, {})).items;
+  await setHidden(t.db, A, row!.id, true);
+  await setHidden(t.db, A, row!.id, false);
+  expect((await listTransactions(t.db, A, {})).items).toHaveLength(5);
+  await expect(setHidden(t.db, B, row!.id, true)).rejects.toThrow(NotFoundError);
 });
 
 it("adds a manual cash transaction and records it", async () => {

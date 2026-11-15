@@ -51,6 +51,11 @@ export function TransactionList({
   }, [items]);
 
   const replace = (row: TransactionRow) => {
+    if (row.hidden && !filters.includeHidden) {
+      setItems((list) => list.filter((r) => r.id !== row.id));
+      setDetail(null);
+      return;
+    }
     setItems((list) => list.map((r) => (r.id === row.id ? row : r)));
     setDetail((d) => (d?.id === row.id ? row : d));
   };
@@ -172,13 +177,16 @@ export function TransactionList({
                     />
                     <div className="flex min-w-0 flex-1 flex-col gap-1 sm:flex-row sm:items-center sm:gap-3">
                       <div className="min-w-0 flex-1">
-                        <p className="truncate text-sm font-medium">{row.description}</p>
+                        <p className={cn("truncate text-sm font-medium", row.hidden && "text-muted-foreground line-through")}>
+                          {row.description}
+                        </p>
                         <p className="truncate text-xs text-muted-foreground">
                           {row.accountName}
                           {row.notes ? ` · ${row.notes}` : ""}
                         </p>
                       </div>
                       <div className="flex min-w-0 items-center gap-2">
+                        {row.hidden && <span className="rounded-full bg-muted px-2 py-0.5 text-xs text-muted-foreground">Hidden</span>}
                         <CategorySelect value={row.categoryId} categories={categories} onChange={(id) => changeCategory(row, id)} />
                       </div>
                     </div>

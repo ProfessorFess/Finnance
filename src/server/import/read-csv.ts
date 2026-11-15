@@ -9,13 +9,13 @@ import type { Table } from "./types";
 export function readCsv(text: string): Table {
   const src = text.charCodeAt(0) === 0xfeff ? text.slice(1) : text;
 
-  const parsed: { data: string[]; start: number }[] = [];
+  const parsed: { data: string[]; start: number; errors: string[] }[] = [];
   let prevEnd = 0;
   Papa.parse<string[]>(src, {
     header: false,
     skipEmptyLines: false,
     step: (result) => {
-      parsed.push({ data: result.data, start: prevEnd });
+      parsed.push({ data: result.data, start: prevEnd, errors: result.errors.map((e) => e.message) });
       prevEnd = result.meta.cursor;
     },
   });
@@ -29,10 +29,11 @@ export function readCsv(text: string): Table {
   };
 
   const out: Table = { headers: [], rows: [], lines: [] };
-  parsed.forEach(({ data, start }, i) => {
+  parsed.forEach(({ data, start, errors }, i) => {
     let s = start;
     while (s < src.length && (src[s] === "\n" || src[s] === "\r")) s++;
     const rowLine = lineAt(s);
+    for (const reason of errors) (out.problems ??= []).push({ line: rowLine, reason });
     if (data.every((f) => f.trim() === "")) return;
     if (i === 0 || out.headers.length === 0) {
       out.headers = data.map((h) => h.trim());

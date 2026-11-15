@@ -39,6 +39,24 @@ test("categorizes one transaction inline", async ({ page, isMobile }) => {
   await expect(page.getByRole("listitem").filter({ hasText: "Prime Video" }).getByRole("button", { name: /Category: Subscriptions/ })).toBeVisible();
 });
 
+test("hides a duplicate and can bring it back", async ({ page, isMobile }) => {
+  test.skip(isMobile);
+  await page.goto("/sign-in?next=/transactions");
+  await signIn(page, TXN_USER);
+  const row = page.getByRole("listitem").filter({ hasText: "Withdrawal Internet Banking" });
+  await row.getByRole("button", { name: "Details" }).click();
+  await page.getByRole("dialog").getByRole("button", { name: "Hide as duplicate" }).click();
+  await expect(row).toHaveCount(0);
+
+  await page.getByRole("checkbox", { name: "Show hidden" }).check();
+  await expect(page).toHaveURL(/hidden=1/);
+  const hiddenRow = page.getByRole("listitem").filter({ hasText: "Withdrawal Internet Banking" });
+  await expect(hiddenRow.getByText("Hidden", { exact: true })).toBeVisible();
+  await hiddenRow.getByRole("button", { name: "Details" }).click();
+  await page.getByRole("dialog").getByRole("button", { name: "Unhide" }).click();
+  await expect(hiddenRow.getByText("Hidden", { exact: true })).toHaveCount(0);
+});
+
 test("adds a cash transaction by hand", async ({ page, isMobile }) => {
   test.skip(isMobile);
   await page.goto("/sign-in?next=/transactions");

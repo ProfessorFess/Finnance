@@ -31,3 +31,38 @@ it("reports bad rows by line and keeps the good ones", () => {
     { line: 7, reason: expect.stringMatching(/Date/) },
   ]);
 });
+
+it("split columns use whichever side is non-zero, even when the other says 0.00", () => {
+  const table = {
+    headers: ["Date", "Description", "Debit", "Credit"],
+    rows: [
+      ["2026-11-10", "Payroll", "0.00", "1200.00"],
+      ["2026-11-11", "Coffee", "4.50", "0.00"],
+      ["2026-11-12", "Both", "1.00", "2.00"],
+      ["2026-11-13", "Neither", "0.00", ""],
+    ],
+    lines: [2, 3, 4, 5],
+  };
+  const { rows, errors } = applyMapping(table, {
+    date: { column: "Date", format: "YYYY-MM-DD" },
+    description: "Description",
+    amount: { kind: "split", debitColumn: "Debit", creditColumn: "Credit" },
+  });
+  expect(rows.map((r) => [r.description, r.amountCents])).toEqual([["Payroll", 120000], ["Coffee", -450]]);
+  expect(errors.map((e) => e.line)).toEqual([4, 5]);
+});
+
+it("flags rows whose column count doesn't match the header", () => {
+  const table = {
+    headers: ["Date", "Description", "Amount"],
+    rows: [["2026-11-10", "Good", "-1.00"], ["2026-11-11", "-2.00"]],
+    lines: [2, 3],
+  };
+  const { rows, errors } = applyMapping(table, {
+    date: { column: "Date", format: "YYYY-MM-DD" },
+    description: "Description",
+    amount: { kind: "signed", column: "Amount" },
+  });
+  expect(rows).toHaveLength(1);
+  expect(errors).toEqual([{ line: 3, reason: expect.stringMatching(/2 columns.*expected 3/) }]);
+});

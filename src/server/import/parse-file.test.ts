@@ -36,3 +36,14 @@ it("parses OFX and XLSX files", async () => {
 it("rejects unsupported files", async () => {
   await expect(parseImportFile({ name: "statement.pdf", bytes: new Uint8Array() }, [])).rejects.toThrow(/CSV, XLSX, or OFX/);
 });
+
+it("rejects a file with a broken quote instead of silently dropping the rows after it", async () => {
+  const text = [
+    "Date, Time, Amount, Type, Description",
+    "2026-11-09,12:00:00,-1.00,Withdrawal,Fine",
+    '2026-11-10,12:00:00,-2.00,Withdrawal,"Broken desc',
+    "2026-11-11,12:00:00,-3.00,Withdrawal,Swallowed one",
+    "2026-11-12,12:00:00,-4.00,Withdrawal,Swallowed two",
+  ].join("\n");
+  await expect(parseImportFile({ name: "ally.csv", bytes: new TextEncoder().encode(text) }, [])).rejects.toThrow(/quote.*line 3/i);
+});

@@ -56,6 +56,14 @@ export async function parseImportFile(
   }
 
   const table = source === "csv" ? readCsv(new TextDecoder().decode(file.bytes)) : await readXlsx(file.bytes);
+  const problem = table.problems?.[0];
+  if (problem) {
+    // A broken quote makes the CSV parser swallow everything after it into one cell,
+    // so importing "the rest" would silently lose rows. Refuse the file instead.
+    throw new ImportError(
+      `This file has a broken quote near line ${problem.line}, so it can't be read safely. Try downloading it again from your bank.`,
+    );
+  }
   const detected = detectMapping(table);
   const profile = profiles.find((p) => p.headerSignature === headerSignature(table.headers));
 

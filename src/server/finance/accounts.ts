@@ -1,8 +1,9 @@
-import { and, asc, eq, isNull, max, sum } from "drizzle-orm";
+import { and, asc, eq, gte, isNull, max, ne, type SQL, sum } from "drizzle-orm";
 import { type AccountType, accounts, importBatches, transactions } from "@/server/db/schema";
 import type { Database } from "@/server/db/types";
 import { logActivity } from "./activity";
 import { NotFoundError, ValidationError } from "./errors";
+import { getTrackingStartDate } from "./settings";
 
 export type Account = typeof accounts.$inferSelect;
 export type AccountWithBalance = Account & { balanceCents: number; lastImportAt: Date | null };
@@ -89,7 +90,10 @@ export async function archiveAccount(db: Database, userId: string, id: string): 
   });
 }
 
-/** Accounts with balance = starting balance + all their transactions, and the last import time. */
+/**
+ * Accounts with their balance and last import time. The starting balance is as of
+ * the tracking start date, so only transactions on or after that date count.
+ */
 export async function listAccounts(
   db: Database,
   userId: string,
@@ -100,10 +104,14 @@ export async function listAccounts(
     : and(eq(accounts.userId, userId), isNull(accounts.archivedAt));
   const rows = await db.select().from(accounts).where(where).orderBy(asc(accounts.createdAt), asc(accounts.name));
 
+  const startDate = await getTrackingStartDate(db, userId);
+  // Rows hidden as duplicates (status "excluded") don't count.
+  const counted: SQL[] = [eq(transactions.userId, userId), ne(transactions.status, "excluded")];
+  if (startDate) counted.push(gte(transactions.date, startDate));
   const sums = await db
     .select({ accountId: transactions.accountId, total: sum(transactions.amountCents).mapWith(Number) })
     .from(transactions)
-    .where(eq(transactions.userId, userId))
+    .where(and(...counted))
     .groupBy(transactions.accountId);
   const imports = await db
     .select({ accountId: importBatches.accountId, last: max(importBatches.createdAt) })

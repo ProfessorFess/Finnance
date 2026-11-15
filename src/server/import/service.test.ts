@@ -95,6 +95,26 @@ it("saves a confirmed mapping as a profile for next time", async () => {
   expect((await previewImport(t.db, A, file)).formatLabel).toBe("Saved format");
 });
 
+it("doesn't save a column layout from an import that brought in nothing", async () => {
+  const file = { name: "bank.csv", bytes: fixtureBytes("generic-bad.csv") };
+  const p = await previewImport(t.db, A, file);
+  // Wrong date format: every row fails, nothing imports.
+  const wrong = { ...p.mapping!, date: { ...p.mapping!.date, format: "MM/DD/YYYY" as const } };
+  const r = await commitImport(t.db, A, { file, accountId: checking.id, mapping: wrong });
+  expect(r.imported + r.duplicates).toBe(0);
+  expect((await previewImport(t.db, A, file)).needsMapping).toBe(true);
+});
+
+it("a corrected column layout replaces the saved one", async () => {
+  const file = { name: "bank.csv", bytes: fixtureBytes("generic-bad.csv") };
+  const p = await previewImport(t.db, A, file);
+  const inverted = { ...p.mapping!, amount: { kind: "signed" as const, column: "Amount", invert: true } };
+  await commitImport(t.db, A, { file, accountId: checking.id, mapping: inverted });
+  expect((await previewImport(t.db, A, file)).sample[0]!.amountCents).toBe(1200);
+  await commitImport(t.db, A, { file, accountId: spending.id, mapping: p.mapping! });
+  expect((await previewImport(t.db, A, file)).sample[0]!.amountCents).toBe(-1200);
+});
+
 it("requires a mapping for an unrecognized layout", async () => {
   const file = { name: "bank.csv", bytes: fixtureBytes("generic-bad.csv") };
   await expect(commitImport(t.db, A, { file, accountId: checking.id })).rejects.toThrow(/columns/);

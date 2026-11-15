@@ -22,6 +22,7 @@ export default async function TransactionsPage({ searchParams }: PageProps<"/tra
     category: one(sp.category),
     from: isoDate(one(sp.from)),
     to: isoDate(one(sp.to)),
+    hidden: one(sp.hidden) === "1" ? "1" : undefined,
   };
   const filters: TransactionFilters = {
     search: urlFilters.q,
@@ -29,6 +30,7 @@ export default async function TransactionsPage({ searchParams }: PageProps<"/tra
     categoryId: urlFilters.category,
     from: urlFilters.from,
     to: urlFilters.to,
+    includeHidden: urlFilters.hidden === "1",
   };
 
   const db = getDb();

@@ -32,6 +32,9 @@ export function ImportWorkspace({ accounts }: { accounts: { id: string; name: st
     update(entry.key, { status: "previewing", error: undefined, mapping });
     const res = await previewFile(formFor(entry, mapping));
     if ("error" in res) return update(entry.key, { status: "error", error: res.error });
+    // Unrecognized layout with a usable guess: preview with the guess right away,
+    // so the user sees real rows and can import as-is or adjust the columns.
+    if (!mapping && res.needsMapping && res.mapping) return void preview(entry, res.mapping);
     setEntries((list) =>
       list.map((e) =>
         e.key === entry.key

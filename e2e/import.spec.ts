@@ -36,6 +36,26 @@ test("imports UFCU and Ally files together, then skips duplicates on re-upload, 
   await expect(recent.getByRole("listitem").filter({ hasText: "ally-spending.csv" }).getByText("Undone")).toBeVisible();
 });
 
+test("imports an unrecognized layout with the guessed columns, and lets you change a saved layout", async ({ page }) => {
+  await page.goto("/sign-in?next=/import");
+  await signIn(page, IMPORT_USER);
+  await page.getByLabel("Choose files").setInputFiles(["src/server/import/__fixtures__/generic-bad.csv"]);
+  const card = page.getByRole("article").filter({ hasText: "generic-bad.csv" });
+  await expect(card.getByText("Which column is which?")).toBeVisible();
+  await expect(card.getByText("2 to import · 3 rows couldn't be read")).toBeVisible();
+  await card.getByLabel("Account").selectOption({ label: "UFCU Checking" });
+  await page.getByRole("button", { name: "Import 1 file" }).click();
+  await expect(card.getByText("2 imported")).toBeVisible();
+
+  await page.getByRole("button", { name: "Import more" }).click();
+  await page.getByLabel("Choose files").setInputFiles(["src/server/import/__fixtures__/generic-bad.csv"]);
+  const again = page.getByRole("article").filter({ hasText: "generic-bad.csv" });
+  await expect(again.getByText("Saved format")).toBeVisible();
+  await expect(again.getByText("Which column is which?")).toBeHidden();
+  await again.getByRole("button", { name: "Change columns" }).click();
+  await expect(again.getByText("Which column is which?")).toBeVisible();
+});
+
 test("sends you to set a start date first", async ({ page }) => {
   await page.goto("/sign-in?next=/import");
   await signIn(page, NOSTART_USER);

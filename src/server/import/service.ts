@@ -216,7 +216,9 @@ export async function commitImport(
     const duplicates = rows.length - imported;
     await tx.update(importBatches).set({ importedCount: imported, duplicateCount: duplicates }).where(eq(importBatches.id, batch!.id));
 
-    if (input.mapping && parsed.table) {
+    // Only remember a layout that actually read some rows; a wrong guess that
+    // imported nothing must not become the silent default for next time.
+    if (input.mapping && parsed.table && rows.length > 0) {
       await tx
         .insert(importProfiles)
         .values({

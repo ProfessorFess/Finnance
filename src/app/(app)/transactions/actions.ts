@@ -12,6 +12,7 @@ import {
   getTransactionHistory,
   listTransactions,
   setCategoryBulk,
+  setHidden,
   type TransactionFilters,
   type TransactionRow,
   updateTransaction,
@@ -32,6 +33,7 @@ const filtersSchema = z.object({
   from: z.string().optional(),
   to: z.string().optional(),
   cursor: z.string().optional(),
+  includeHidden: z.boolean().optional(),
 });
 
 export async function loadMore(filters: TransactionFilters): Promise<{ items: TransactionRow[]; nextCursor: string | null } | Failure> {
@@ -104,6 +106,18 @@ export async function saveNotes(id: string, notes: string): Promise<TransactionR
   }
 }
 
+export async function setHiddenAction(id: string, hidden: boolean): Promise<TransactionRow | Failure> {
+  const user = await requireUser();
+  try {
+    const row = await setHidden(getDb(), user.id, z.string().parse(id), z.boolean().parse(hidden));
+    revalidatePath("/transactions");
+    revalidatePath("/accounts");
+    return row;
+  } catch (err) {
+    return toFailure(err);
+  }
+}
+
 export async function removeTransaction(id: string): Promise<{ ok: true } | Failure> {
   const user = await requireUser();
   try {
@@ -122,6 +136,8 @@ const LABELS: Record<string, string> = {
   "transaction.create": "Added by hand",
   "transaction.bulk_categorize": "Category changed",
   "transaction.delete": "Deleted",
+  "transaction.hide": "Hidden as a duplicate",
+  "transaction.unhide": "Unhidden",
 };
 
 function labelFor(action: string, before: unknown, after: unknown): string {

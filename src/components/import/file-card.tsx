@@ -113,6 +113,12 @@ export function FileCard({
               </select>
             </div>
 
+            {p.formatLabel === "Saved format" && !entry.mapping && !locked && (
+              <Button variant="outline" size="sm" className="self-start" onClick={() => p.mapping && onMapping(p.mapping)}>
+                Change columns
+              </Button>
+            )}
+
             {(p.needsMapping || entry.mapping) && (
               <MappingEditor
                 idPrefix={entry.key}

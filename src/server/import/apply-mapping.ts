@@ -14,6 +14,11 @@ export function applyMapping(table: Table, mapping: ColumnMapping): { rows: Pars
 
   table.rows.forEach((cells, i) => {
     const line = table.lines[i] ?? i + 2;
+    const extra = cells.slice(table.headers.length);
+    if (cells.length < table.headers.length || extra.some((c) => c.trim() !== "")) {
+      errors.push({ line, reason: `Row has ${cells.length} columns, expected ${table.headers.length}` });
+      return;
+    }
     const get = (col: string | undefined) => (col === undefined ? "" : (cells[index.get(col) ?? -1] ?? "").trim());
 
     const rawDate = get(mapping.date.column);
@@ -60,15 +65,21 @@ function readAmount(mapping: ColumnMapping, get: (col: string) => string): { cen
     const isDebit = a.debitValues.some((v) => v.toLowerCase() === get(a.indicatorColumn).toLowerCase());
     return { cents: isDebit ? -Math.abs(cents) : Math.abs(cents) };
   }
-  const debit = get(a.debitColumn);
-  const credit = get(a.creditColumn);
-  if (debit) {
-    const cents = parseAmountToCents(debit);
-    return cents === null ? bad(a.debitColumn) : { cents: -Math.abs(cents) };
+  // Many banks write 0.00 in the unused column, so "present" means non-zero.
+  const read = (col: string): number | null | "bad" => {
+    const raw = get(col);
+    if (!raw) return null;
+    const cents = parseAmountToCents(raw);
+    return cents === null ? "bad" : cents === 0 ? null : Math.abs(cents);
+  };
+  const debit = read(a.debitColumn);
+  const credit = read(a.creditColumn);
+  if (debit === "bad") return bad(a.debitColumn);
+  if (credit === "bad") return bad(a.creditColumn);
+  if (debit !== null && credit !== null) {
+    return { error: `Amount: both "${a.debitColumn}" and "${a.creditColumn}" have amounts` };
   }
-  if (credit) {
-    const cents = parseAmountToCents(credit);
-    return cents === null ? bad(a.creditColumn) : { cents: Math.abs(cents) };
-  }
-  return { error: `Amount: both "${a.debitColumn}" and "${a.creditColumn}" are empty` };
+  if (debit !== null) return { cents: -debit };
+  if (credit !== null) return { cents: credit };
+  return { error: `Amount: both "${a.debitColumn}" and "${a.creditColumn}" are empty or zero` };
 }

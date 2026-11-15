@@ -1,10 +1,11 @@
 import { randomUUID } from "node:crypto";
-import { and, desc, eq, gte, ilike, inArray, isNull, lte, or, type SQL, sql } from "drizzle-orm";
-import { parseDateValue } from "@/lib/dates";
+import { and, desc, eq, gte, ilike, inArray, isNull, lte, ne, or, type SQL, sql } from "drizzle-orm";
+import { formatDisplayDate, parseDateValue } from "@/lib/dates";
 import { accounts, categories, type TransactionSource, transactions } from "@/server/db/schema";
 import type { Database, Executor } from "@/server/db/types";
 import { type ActivityEntry, listActivity, logActivity } from "./activity";
 import { NotFoundError, ValidationError } from "./errors";
+import { getTrackingStartDate } from "./settings";
 
 export type TransactionFilters = {
   search?: string;
@@ -14,7 +15,12 @@ export type TransactionFilters = {
   to?: string;
   cursor?: string;
   limit?: number;
+  /** Include rows hidden as duplicates (status "excluded"). */
+  includeHidden?: boolean;
 };
+
+/** Status of a row the user hid as a duplicate: kept (so re-imports still skip it) but not counted. */
+export const HIDDEN_STATUS = "excluded";
 
 export type TransactionRow = {
   id: string;
@@ -28,6 +34,7 @@ export type TransactionRow = {
   notes: string | null;
   source: TransactionSource;
   status: string;
+  hidden: boolean;
 };
 
 type Cursor = { date: string; createdAt: string; id: string };
@@ -77,7 +84,7 @@ async function getRow(db: Executor, userId: string, id: string) {
 function toRow(r: Awaited<ReturnType<typeof getRow>>): TransactionRow {
   const { createdAt, ...row } = r;
   void createdAt;
-  return row;
+  return { ...row, hidden: row.status === HIDDEN_STATUS };
 }
 
 async function assertCategory(db: Executor, userId: string, categoryId: string | null | undefined) {
@@ -97,6 +104,10 @@ export async function listTransactions(
 ): Promise<{ items: TransactionRow[]; nextCursor: string | null }> {
   const limit = Math.min(Math.max(f.limit ?? 100, 1), 200);
   const where: SQL[] = [eq(transactions.userId, userId)];
+  // Rows before the tracking start date are outside tracking (e.g. after the date moved).
+  const startDate = await getTrackingStartDate(db, userId);
+  if (startDate) where.push(gte(transactions.date, startDate));
+  if (!f.includeHidden) where.push(ne(transactions.status, HIDDEN_STATUS));
   if (f.search?.trim()) {
     const q = `%${escapeLike(f.search.trim())}%`;
     where.push(or(ilike(transactions.rawDescription, q), ilike(transactions.notes, q))!);
@@ -143,6 +154,10 @@ export async function createManualTransaction(
     .where(and(eq(accounts.id, input.accountId), eq(accounts.userId, userId)));
   if (!account) throw new NotFoundError("Account");
   if (parseDateValue(input.date, "YYYY-MM-DD") === null) throw new ValidationError("Enter a valid date");
+  const startDate = await getTrackingStartDate(db, userId);
+  if (startDate && input.date < startDate) {
+    throw new ValidationError(`That date is before your tracking start date (${formatDisplayDate(startDate)})`);
+  }
   const description = input.description.trim();
   if (!description) throw new ValidationError("Description is required");
   if (!Number.isSafeInteger(input.amountCents) || input.amountCents === 0) throw new ValidationError("Enter an amount");
@@ -253,6 +268,32 @@ export async function deleteTransaction(db: Database, userId: string, id: string
   await db.transaction(async (tx) => {
     await tx.delete(transactions).where(and(eq(transactions.id, id), eq(transactions.userId, userId)));
     await logActivity(tx, { userId, actor: "user", action: "transaction.delete", entityType: "transaction", entityId: id, before: toRow(before) });
+  });
+}
+
+/**
+ * Hides (or unhides) a row, typically a duplicate the bank re-sent with different
+ * text. The row stays, with its dedupe hash, so re-imports keep skipping it; it
+ * just stops counting toward balances and lists.
+ */
+export async function setHidden(db: Database, userId: string, id: string, hidden: boolean): Promise<TransactionRow> {
+  const before = await getRow(db, userId, id);
+  return db.transaction(async (tx) => {
+    await tx
+      .update(transactions)
+      .set({ status: hidden ? HIDDEN_STATUS : "cleared" })
+      .where(and(eq(transactions.id, id), eq(transactions.userId, userId)));
+    const after = toRow(await getRow(tx, userId, id));
+    await logActivity(tx, {
+      userId,
+      actor: "user",
+      action: hidden ? "transaction.hide" : "transaction.unhide",
+      entityType: "transaction",
+      entityId: id,
+      before: { status: before.status },
+      after: { status: after.status },
+    });
+    return after;
   });
 }
 

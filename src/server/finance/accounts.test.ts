@@ -4,6 +4,7 @@ import { createTestUser, insertTestTransaction } from "@/test/users";
 import { archiveAccount, createAccount, listAccounts, updateAccount } from "./accounts";
 import { listActivity } from "./activity";
 import { NotFoundError } from "./errors";
+import { setTrackingStartDate } from "./settings";
 
 let t: Awaited<ReturnType<typeof createTestDb>>;
 let userA: string;
@@ -57,4 +58,15 @@ it("isolates users", async () => {
   expect(await listAccounts(t.db, userB)).toHaveLength(0);
   await expect(updateAccount(t.db, userB, a.id, { name: "x" })).rejects.toThrow(NotFoundError);
   await expect(archiveAccount(t.db, userB, a.id)).rejects.toThrow(NotFoundError);
+});
+
+it("balances count only transactions on or after the tracking start date", async () => {
+  const a = await createAccount(t.db, userA, checking);
+  await setTrackingStartDate(t.db, userA, "2026-11-07");
+  await insertTestTransaction(t.db, userA, a.id, { amountCents: -500, date: "2026-11-06" });
+  await insertTestTransaction(t.db, userA, a.id, { amountCents: -100, date: "2026-11-07" });
+  expect((await listAccounts(t.db, userA))[0]!.balanceCents).toBe(152_034 - 100);
+  // Moving the start date later drops the earlier rows from the balance.
+  await setTrackingStartDate(t.db, userA, "2026-11-08");
+  expect((await listAccounts(t.db, userA))[0]!.balanceCents).toBe(152_034);
 });

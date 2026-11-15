@@ -2,7 +2,7 @@
 
 import { useEffect, useState, useTransition } from "react";
 import { toast } from "sonner";
-import { getHistory, type HistoryItem, removeTransaction, saveNotes } from "@/app/(app)/transactions/actions";
+import { getHistory, type HistoryItem, removeTransaction, saveNotes, setHiddenAction } from "@/app/(app)/transactions/actions";
 import { Button } from "@/components/ui/button";
 import { Label } from "@/components/ui/label";
 import { Sheet, SheetContent, SheetDescription, SheetHeader, SheetTitle } from "@/components/ui/sheet";
@@ -107,6 +107,30 @@ export function TransactionSheet({
                   {history === null && <li className="text-muted-foreground">Loading…</li>}
                 </ol>
               </section>
+              {row.source !== "manual" && (
+                <div className="flex flex-col gap-1.5">
+                  <Button
+                    variant="outline"
+                    className="self-start"
+                    disabled={pending}
+                    onClick={() =>
+                      startTransition(async () => {
+                        const res = await setHiddenAction(row.id, !row.hidden);
+                        if ("error" in res) return void toast.error(res.error);
+                        onChange(res);
+                        toast.success(res.hidden ? "Hidden. It won't count toward balances." : "Unhidden");
+                      })
+                    }
+                  >
+                    {row.hidden ? "Unhide" : "Hide as duplicate"}
+                  </Button>
+                  {!row.hidden && (
+                    <p className="text-xs text-muted-foreground">
+                      For a transaction that came in twice. It stays out of balances and won&apos;t come back on re-import.
+                    </p>
+                  )}
+                </div>
+              )}
               {row.source === "manual" && (
                 <Button
                   variant="outline"

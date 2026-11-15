@@ -33,6 +33,12 @@ export function StartDateCard({ startDate }: { startDate: string | null }) {
       <p className="mt-1 text-sm text-muted-foreground">
         Pick the day you start fresh, usually your next payday. Anything earlier in your bank files is skipped.
       </p>
+      {startDate && (
+        <p className="mt-2 rounded-lg bg-muted px-3 py-2 text-sm">
+          Changing it hides transactions before the new date from balances and lists. Afterwards, update each
+          account&apos;s starting balance to match the new date.
+        </p>
+      )}
       <form
         className="mt-4 flex flex-wrap items-end gap-3"
         action={(formData) =>

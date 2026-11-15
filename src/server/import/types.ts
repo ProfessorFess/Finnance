@@ -35,4 +35,4 @@ export type ParsedRow = {
 export type RowError = { line: number; reason: string };
 
 /** A tabular file. `lines[i]` is the original 1-based file line where `rows[i]` starts. */
-export type Table = { headers: string[]; rows: string[][]; lines: number[] };
+export type Table = { headers: string[]; rows: string[][]; lines: number[]; problems?: RowError[] };

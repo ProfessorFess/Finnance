@@ -7,7 +7,7 @@ import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { CategoryOptions, type CategoryOption } from "./category-select";
 
-export type UrlFilters = { q?: string; account?: string; category?: string; from?: string; to?: string };
+export type UrlFilters = { q?: string; account?: string; category?: string; from?: string; to?: string; hidden?: string };
 
 const selectClass = "h-8 rounded-lg border border-input bg-background px-2 text-sm";
 
@@ -24,6 +24,7 @@ export function FiltersBar({
   const router = useRouter();
   const pathname = usePathname();
   const [q, setQ] = useState(filters.q ?? "");
+  const [showHidden, setShowHidden] = useState(filters.hidden === "1");
   const timer = useRef<ReturnType<typeof setTimeout> | null>(null);
 
   const push = (next: UrlFilters) => {
@@ -82,6 +83,17 @@ export function FiltersBar({
           To
           <input type="date" aria-label="To date" className={selectClass} value={filters.to ?? ""}
             onChange={(e) => set({ to: e.target.value })} />
+        </label>
+        <label className="flex items-center gap-1.5 text-xs text-muted-foreground">
+          <input
+            type="checkbox"
+            checked={showHidden}
+            onChange={(e) => {
+              setShowHidden(e.target.checked);
+              set({ hidden: e.target.checked ? "1" : undefined });
+            }}
+          />
+          Show hidden
         </label>
         {active && (
           <Button variant="ghost" size="sm" onClick={() => {

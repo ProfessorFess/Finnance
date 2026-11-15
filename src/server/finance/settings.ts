@@ -1,7 +1,7 @@
 import { eq } from "drizzle-orm";
 import { parseDateValue } from "@/lib/dates";
 import { userSettings } from "@/server/db/schema";
-import type { Database } from "@/server/db/types";
+import type { Database, Executor } from "@/server/db/types";
 import { logActivity } from "./activity";
 import { ValidationError } from "./errors";
 
@@ -30,4 +30,13 @@ export async function setTrackingStartDate(db: Database, userId: string, date: s
       after: { trackingStartDate: date },
     });
   });
+}
+
+/** The tracking start date without creating a settings row (null when unset). */
+export async function getTrackingStartDate(db: Executor, userId: string): Promise<string | null> {
+  const [row] = await db
+    .select({ d: userSettings.trackingStartDate })
+    .from(userSettings)
+    .where(eq(userSettings.userId, userId));
+  return row?.d ?? null;
 }
