@@ -1,0 +1,9 @@
+﻿Account number(BBAN),Account name,Counter party account number,Counter party name,Currency,Amount,Credit/debit indicator,Book date,Transaction type,Transaction group,Transaction reference,Instructed currency,currency exchange rate,Instructed amount,Description,Category,Check number
+1800000001234,FREE CHECKING,,,USD,20.84,Debit,11/15/2026,Pending,Withdrawal,,USD,,0.00,Uber Eats,Food & Dining,
+1800000001234,FREE CHECKING,,,USD,21.64,Debit,11/14/2026,Credit / Debit Card,Withdrawal,,USD,,0.00,Prime Video,Bills & Utilities,
+1800000001234,FREE CHECKING,,,USD,1200.00,Credit,11/14/2026,ACH,Deposit,,USD,,0.00,Payroll Acme Corp,Income,
+1800000001234,FREE CHECKING,,,USD,6.25,Debit,11/13/2026,POS,Withdrawal,,USD,,0.00,Bennu Coffee,Food & Dining,
+1800000001234,FREE CHECKING,,,USD,6.25,Debit,11/13/2026,POS,Withdrawal,,USD,,0.00,Bennu Coffee,Food & Dining,
+1800000001234,FREE CHECKING,,,USD,100.00,Debit,11/12/2026,Home Banking,Withdrawal,,USD,,0.00,"Withdrawal Internet Banking Transfer To Share 0001
+Savings",Transfer,
+1800000001234,FREE CHECKING,,,USD,45.10,Debit,11/02/2026,Credit / Debit Card,Withdrawal,,USD,,0.00,HEB,Groceries,
