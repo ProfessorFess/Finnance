@@ -11,7 +11,8 @@
     "test": "vitest run",
     "db:up": "docker compose up -d --wait postgres",
     "db:generate": "drizzle-kit generate",
-    "db:migrate": "drizzle-kit migrate"
+    "db:migrate": "drizzle-kit migrate",
+    "create-owner": "tsx scripts/create-owner.ts"
   },
   "dependencies": {
     "@vercel/functions": "^3.11.3",
@@ -25,6 +26,7 @@
   },
   "devDependencies": {
     "@electric-sql/pglite": "^0.5.16",
+    "@inquirer/prompts": "^8.8.0",
     "@tailwindcss/turbopack": "4.3.3",
     "@types/node": "^20",
     "@types/pg": "^8.23.1",
@@ -35,6 +37,7 @@
     "eslint": "^9",
     "eslint-config-next": "16.4.6",
     "tailwindcss": "4.3.3",
+    "tsx": "^4.23.15",
     "typescript": "^5",
     "vite-tsconfig-paths": "^6.1.1",
     "vitest": "^5.1.0"
