@@ -3,6 +3,10 @@ import type { Page } from "@playwright/test";
 // Test-only credentials, created fresh in the e2e database by global-setup.
 export const OWNER = { name: "E2E Owner", email: "owner@e2e.test", password: "e2e-owner-password-123" };
 export const TWOFA_USER = { name: "E2E TwoFA", email: "twofa@e2e.test", password: "e2e-twofa-password-123" };
+export const ACCOUNTS_USER = { name: "E2E Accounts", email: "accounts@e2e.test", password: "e2e-accounts-password-1" };
+export const IMPORT_USER = { name: "E2E Import", email: "import@e2e.test", password: "e2e-import-password-12" };
+export const TXN_USER = { name: "E2E Txn", email: "txn@e2e.test", password: "e2e-txn-password-1234" };
+export const NOSTART_USER = { name: "E2E NoStart", email: "nostart@e2e.test", password: "e2e-nostart-password-1" };
 export const OWNER_STATE = "e2e/.auth/owner.json";
 
 const octet = () => Math.floor(Math.random() * 254) + 1;

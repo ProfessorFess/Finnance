@@ -9,12 +9,9 @@ test.beforeEach(async ({ page }) => {
 const desktopLinks = ["Home", "Transactions", "Plan", "Goals", "Recurring", "Accounts", "Import", "Settings"];
 const placeholders: [string, string, RegExp][] = [
   ["/", "Home", /Phase 2a/],
-  ["/transactions", "Transactions", /Phase 1/],
   ["/plan", "Plan", /Phase 2a/],
   ["/goals", "Goals", /Phase 2a/],
-  ["/recurring", "Recurring", /Phase 1/],
-  ["/accounts", "Accounts", /Phase 1/],
-  ["/import", "Import", /Phase 1/],
+  ["/recurring", "Recurring", /Phase 1c/],
 ];
 
 test("desktop shows the sidebar and hides bottom tabs", async ({ page, isMobile }) => {
