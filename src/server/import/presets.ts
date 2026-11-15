@@ -25,6 +25,7 @@ export const PRESETS: Record<PresetId, { label: string; institution: string; sig
       pending: { column: "Transaction type", values: ["Pending"] },
       bankCategory: "Category",
       accountNumber: "Account number(BBAN)",
+      accountName: "Account name",
     },
   },
   ally: {

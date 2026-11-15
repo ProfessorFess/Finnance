@@ -1,0 +1,3 @@
+﻿Account number(BBAN),Account name,Counter party account number,Counter party name,Currency,Amount,Credit/debit indicator,Book date,Transaction type,Transaction group,Transaction reference,Instructed currency,currency exchange rate,Instructed amount,Description,Category,Check number
+1000000001234,REGULAR SAVINGS,,,USD,243.00,Credit,11/11/2026,Home Banking,Deposit,,USD,,0.00,Deposit Internet Banking Transfer From Share 0080,Transfer,
+1000000001234,REGULAR SAVINGS,,,USD,0.12,Credit,11/10/2026,Dividend,Deposit,,USD,,0.00,Dividend,Investments,

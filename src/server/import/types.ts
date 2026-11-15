@@ -16,6 +16,8 @@ export type ColumnMapping = {
   pending?: { column: string; values: string[] };
   bankCategory?: string;
   accountNumber?: string;
+  /** Column naming the account (e.g. UFCU's "FREE CHECKING"), used to pick the right account. */
+  accountName?: string;
 };
 
 /** One transaction read from a file, before any import decisions. */

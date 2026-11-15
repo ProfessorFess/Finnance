@@ -22,6 +22,8 @@ export type ParsedFile = {
   table: Table | null;
   mapping: ColumnMapping | null;
   accountHint: string | null;
+  /** The file's own name for the account, when it has one (UFCU: "REGULAR SAVINGS"). */
+  accountLabel: string | null;
   rows: ParsedRow[];
   errors: RowError[];
 };
@@ -50,7 +52,7 @@ export async function parseImportFile(
 
   if (source === "ofx") {
     const ofx = readOfx(new TextDecoder().decode(file.bytes));
-    return { source, format: { kind: "ofx" }, table: null, mapping: null, accountHint: ofx.accountId, rows: ofx.rows, errors: ofx.errors };
+    return { source, format: { kind: "ofx" }, table: null, mapping: null, accountHint: ofx.accountId, accountLabel: null, rows: ofx.rows, errors: ofx.errors };
   }
 
   const table = source === "csv" ? readCsv(new TextDecoder().decode(file.bytes)) : await readXlsx(file.bytes);
@@ -82,7 +84,13 @@ export async function parseImportFile(
     usable = false;
   }
 
-  if (!usable || !chosen) return { source, format, table, mapping: chosen, accountHint: null, rows: [], errors: [] };
+  if (!usable || !chosen) return { source, format, table, mapping: chosen, accountHint: null, accountLabel: null, rows: [], errors: [] };
   const { rows, errors } = applyMapping(table, chosen);
-  return { source, format, table, mapping: chosen, accountHint: rows.find((r) => r.accountNumber)?.accountNumber ?? null, rows, errors };
+  const labelIndex = chosen.accountName === undefined ? -1 : table.headers.indexOf(chosen.accountName);
+  const accountLabel = labelIndex >= 0 ? (table.rows.find((r) => r[labelIndex]?.trim())?.[labelIndex]?.trim() ?? null) : null;
+  return {
+    source, format, table, mapping: chosen,
+    accountHint: rows.find((r) => r.accountNumber)?.accountNumber ?? null,
+    accountLabel, rows, errors,
+  };
 }
