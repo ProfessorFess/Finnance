@@ -124,19 +124,19 @@ export function FileCard({
 
             {p.sample.length > 0 && (
               <div className="overflow-x-auto rounded-lg border">
-                <table className="w-full min-w-[28rem] text-sm">
+                <table className="w-full table-fixed text-sm">
                   <thead className="bg-muted/60 text-left text-xs text-muted-foreground">
                     <tr>
-                      <th className="px-3 py-2 font-medium">Date</th>
+                      <th className="w-28 px-3 py-2 font-medium">Date</th>
                       <th className="px-3 py-2 font-medium">Description</th>
-                      <th className="px-3 py-2 text-right font-medium">Amount</th>
+                      <th className="w-28 px-3 py-2 text-right font-medium">Amount</th>
                     </tr>
                   </thead>
                   <tbody>
                     {p.sample.map((r) => (
                       <tr key={`${r.line}`} className="border-t">
-                        <td className="num px-3 py-2 whitespace-nowrap">{formatDisplayDate(r.date)}</td>
-                        <td className="max-w-[16rem] truncate px-3 py-2">{r.description}</td>
+                        <td className="px-3 py-2 whitespace-nowrap">{formatDisplayDate(r.date)}</td>
+                        <td className="truncate px-3 py-2">{r.description}</td>
                         <td className={cn("num px-3 py-2 text-right whitespace-nowrap", r.amountCents > 0 && "text-positive")}>
                           {formatCents(r.amountCents, { sign: "always" })}
                         </td>

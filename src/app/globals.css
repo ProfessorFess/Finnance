@@ -126,9 +126,10 @@
 }
 
 @layer utilities {
-  /* Money and other figures: tabular, lining numerals so columns line up. */
+  /* Money and other figures: lining numerals. Not tabular: Schibsted Grotesk's
+     tabular set also widens "." and ",", which reads as "$21 . 64". */
   .num {
-    font-variant-numeric: tabular-nums lining-nums;
+    font-variant-numeric: lining-nums;
   }
   .pb-safe {
     padding-bottom: env(safe-area-inset-bottom);

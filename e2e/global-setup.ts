@@ -1,3 +1,4 @@
+import { readFileSync } from "node:fs";
 import { sql } from "drizzle-orm";
 import { drizzle } from "drizzle-orm/node-postgres";
 import { migrate } from "drizzle-orm/node-postgres/migrator";
@@ -6,6 +7,7 @@ import { createAuth } from "../src/server/auth/auth";
 import { createOwner } from "../src/server/auth/create-owner";
 import { createAccount } from "../src/server/finance/accounts";
 import { setTrackingStartDate } from "../src/server/finance/settings";
+import { commitImport } from "../src/server/import/service";
 import * as schema from "../src/server/db/schema";
 import { assertSafeE2EDatabase } from "../src/test/e2e-db-guard";
 import { E2E_ENV } from "./env";
@@ -29,7 +31,13 @@ export default async function globalSetup() {
   await setTrackingStartDate(db, importUser.id, "2026-11-07");
   await createAccount(db, importUser.id, { name: "UFCU Checking", type: "checking", institution: "UFCU", startingBalanceCents: 0 });
   await createAccount(db, importUser.id, { name: "Ally Spending", type: "checking", institution: "Ally", startingBalanceCents: 0 });
-  await createOwner(auth, TXN_USER);
+  const txnUser = await createOwner(auth, TXN_USER);
+  await setTrackingStartDate(db, txnUser.id, "2026-11-07");
+  const txnChecking = await createAccount(db, txnUser.id, { name: "UFCU Checking", type: "checking", institution: "UFCU", startingBalanceCents: 0 });
+  await commitImport(db, txnUser.id, {
+    file: { name: "ufcu-checking.csv", bytes: new Uint8Array(readFileSync("src/server/import/__fixtures__/ufcu-checking.csv")) },
+    accountId: txnChecking.id,
+  });
   await createOwner(auth, NOSTART_USER);
   await pool.end();
 }
