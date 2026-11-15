@@ -2,7 +2,8 @@
 
 import { useEffect, useState, useTransition } from "react";
 import { toast } from "sonner";
-import { getHistory, type HistoryItem, removeTransaction, saveNotes, setHiddenAction } from "@/app/(app)/transactions/actions";
+import { getHistory, type HistoryItem, notATransferAction, removeTransaction, saveNotes, setHiddenAction } from "@/app/(app)/transactions/actions";
+import { NOT_A_TRANSFER } from "@/lib/transfer-constants";
 import { Button } from "@/components/ui/button";
 import { Label } from "@/components/ui/label";
 import { Sheet, SheetContent, SheetDescription, SheetHeader, SheetTitle } from "@/components/ui/sheet";
@@ -21,6 +22,23 @@ const SOURCE_LABELS: Record<string, string> = {
   sync: "Synced from your bank",
 };
 
+/** One line on how this transaction got its category. */
+function provenance(row: TransactionRow): string {
+  if (row.transferPairId && row.transferPairId !== NOT_A_TRANSFER) return "Paired transfer";
+  switch (row.categorizationSource) {
+    case "rule":
+      return "Sorted by your rule";
+    case "history":
+      return "Sorted by your past choice";
+    case "ai":
+      return `Sorted by AI (${Math.round((row.categorizationConfidence ?? 0) * 100)}% sure)`;
+    case "user":
+      return "You chose this";
+    default:
+      return "Not sorted yet";
+  }
+}
+
 /** Full detail for one transaction: notes, category, and its change history. */
 export function TransactionSheet({
   row,
@@ -28,6 +46,7 @@ export function TransactionSheet({
   onClose,
   onChange,
   onCategory,
+  onUnpaired,
   onRemoved,
 }: {
   row: TransactionRow | null;
@@ -35,6 +54,7 @@ export function TransactionSheet({
   onClose: () => void;
   onChange: (row: TransactionRow) => void;
   onCategory: (row: TransactionRow, categoryId: string | null) => void;
+  onUnpaired: (row: TransactionRow) => void;
   onRemoved: (id: string) => void;
 }) {
   const [history, setHistory] = useState<HistoryItem[] | null>(null);
@@ -69,11 +89,28 @@ export function TransactionSheet({
               </p>
               <div className="flex flex-col gap-1.5">
                 <span className="text-xs font-medium text-muted-foreground">Category</span>
-                <CategorySelect
-                  value={row.categoryId}
-                  categories={categories}
-                  onChange={(categoryId) => onCategory(row, categoryId)}
-                />
+                {row.transferPairId && row.transferPairId !== NOT_A_TRANSFER ? (
+                  <div className="flex flex-wrap items-center gap-2">
+                    <span className="rounded-full bg-secondary px-2.5 py-0.5 text-xs">Transfer</span>
+                    <Button
+                      variant="outline"
+                      size="sm"
+                      disabled={pending}
+                      onClick={() =>
+                        startTransition(async () => {
+                          const res = await notATransferAction(row.id);
+                          if ("error" in res) return void toast.error(res.error);
+                          onUnpaired(row);
+                        })
+                      }
+                    >
+                      Not a transfer
+                    </Button>
+                  </div>
+                ) : (
+                  <CategorySelect value={row.categoryId} categories={categories} onChange={(categoryId) => onCategory(row, categoryId)} />
+                )}
+                <span className="text-xs text-muted-foreground">{provenance(row)}</span>
               </div>
               <div className="flex flex-col gap-1.5">
                 <Label htmlFor="tx-notes">Notes</Label>

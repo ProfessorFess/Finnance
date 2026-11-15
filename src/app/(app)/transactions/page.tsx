@@ -1,3 +1,4 @@
+import Link from "next/link";
 import { PageHeader } from "@/components/empty-state";
 import { FiltersBar, type UrlFilters } from "@/components/transactions/filters-bar";
 import { TransactionList } from "@/components/transactions/transaction-list";
@@ -6,7 +7,7 @@ import { getDb } from "@/server/db/client";
 import { listAccounts } from "@/server/finance/accounts";
 import { listCategories } from "@/server/finance/categories";
 import { getSettings } from "@/server/finance/settings";
-import { listTransactions, type TransactionFilters } from "@/server/finance/transactions";
+import { countNeedsReview, listTransactions, type TransactionFilters } from "@/server/finance/transactions";
 
 export const metadata = { title: "Transactions · Finnance" };
 
@@ -34,11 +35,12 @@ export default async function TransactionsPage({ searchParams }: PageProps<"/tra
   };
 
   const db = getDb();
-  const [page, accounts, categories, settings] = await Promise.all([
+  const [page, accounts, categories, settings, reviewCount] = await Promise.all([
     listTransactions(db, user.id, filters),
     listAccounts(db, user.id),
     listCategories(db, user.id),
     getSettings(db, user.id),
+    countNeedsReview(db, user.id),
   ]);
   const accountOptions = accounts.map((a) => ({ id: a.id, name: a.name }));
   const categoryOptions = categories.map((c) => ({ id: c.id, name: c.name, groupName: c.groupName }));
@@ -46,6 +48,18 @@ export default async function TransactionsPage({ searchParams }: PageProps<"/tra
   return (
     <div className="rise">
       <PageHeader title="Transactions" description="Everything in and out of your accounts." />
+      {reviewCount > 0 && (
+        <Link
+          href="/transactions/review"
+          className="mb-4 flex items-center gap-3 rounded-xl border border-primary/30 bg-primary/5 px-4 py-3 text-sm transition-colors hover:bg-primary/10"
+        >
+          <span className="size-2 rounded-full bg-primary" aria-hidden="true" />
+          <span className="flex-1">
+            {reviewCount} {reviewCount === 1 ? "transaction needs" : "transactions need"} a look
+          </span>
+          <span className="font-medium text-primary">Review</span>
+        </Link>
+      )}
       <FiltersBar filters={urlFilters} accounts={accountOptions} categories={categoryOptions} />
       <TransactionList
         key={JSON.stringify(urlFilters)}

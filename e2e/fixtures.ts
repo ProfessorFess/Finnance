@@ -7,6 +7,11 @@ export const ACCOUNTS_USER = { name: "E2E Accounts", email: "accounts@e2e.test",
 export const IMPORT_USER = { name: "E2E Import", email: "import@e2e.test", password: "e2e-import-password-12" };
 export const TXN_USER = { name: "E2E Txn", email: "txn@e2e.test", password: "e2e-txn-password-1234" };
 export const NOSTART_USER = { name: "E2E NoStart", email: "nostart@e2e.test", password: "e2e-nostart-password-1" };
+export const TRANSFER_USER = { name: "E2E Transfer", email: "transfer@e2e.test", password: "e2e-transfer-password-1" };
+export const LEARN_USER = { name: "E2E Learn", email: "learn@e2e.test", password: "e2e-learn-password-123" };
+export const REVIEW_USER = { name: "E2E Review", email: "review@e2e.test", password: "e2e-review-password-12" };
+export const REVIEW_USER_M = { name: "E2E Review Mobile", email: "review-m@e2e.test", password: "e2e-review-m-password-1" };
+export const RULES_USER = { name: "E2E Rules", email: "rules@e2e.test", password: "e2e-rules-password-123" };
 export const OWNER_STATE = "e2e/.auth/owner.json";
 
 const octet = () => Math.floor(Math.random() * 254) + 1;

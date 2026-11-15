@@ -1,5 +1,6 @@
 "use client";
 
+import Link from "next/link";
 import { CircleAlert, CircleCheck, FileText, LoaderCircle, X } from "lucide-react";
 import { Badge } from "@/components/ui/badge";
 import { Button } from "@/components/ui/button";
@@ -30,7 +31,10 @@ export function countLine(p: ImportPreview): string {
 }
 
 export function resultLine(r: ImportResult): string {
-  return r.duplicates > 0 ? `${r.imported} imported · ${r.duplicates} already here` : `${r.imported} imported`;
+  const parts = [`${r.imported} imported`];
+  if (r.duplicates > 0) parts.push(`${r.duplicates} already here`);
+  if (r.transfers > 0) parts.push(`${r.transfers} ${r.transfers === 1 ? "transfer" : "transfers"} matched`);
+  return parts.join(" · ");
 }
 
 export function FileCard({
@@ -85,6 +89,14 @@ export function FileCard({
         {entry.status === "done" && entry.result && (
           <p className="flex items-center gap-2 text-sm font-medium">
             <CircleCheck className="size-4 text-positive" /> {resultLine(entry.result)}
+            {entry.result.needsReview > 0 && (
+              <>
+                {" · "}
+                <Link href="/transactions/review" className="text-primary underline-offset-4 hover:underline">
+                  {entry.result.needsReview} need a look
+                </Link>
+              </>
+            )}
           </p>
         )}
 

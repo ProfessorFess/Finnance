@@ -108,6 +108,15 @@ async function assertCategory(db: Executor, userId: string, categoryId: string |
   if (!c) throw new NotFoundError("Category");
 }
 
+/** How many visible rows Finnance wasn't sure about. */
+export async function countNeedsReview(db: Database, userId: string): Promise<number> {
+  const where: SQL[] = [eq(transactions.userId, userId), eq(transactions.needsReview, true), ne(transactions.status, HIDDEN_STATUS)];
+  const startDate = await getTrackingStartDate(db, userId);
+  if (startDate) where.push(gte(transactions.date, startDate));
+  const [row] = await db.select({ n: sql<number>`count(*)::int` }).from(transactions).where(and(...where));
+  return row?.n ?? 0;
+}
+
 /** Newest first, filtered, cursor-paginated. */
 export async function listTransactions(
   db: Database,

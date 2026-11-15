@@ -1,10 +1,12 @@
 "use client";
 
-import { ListOrdered } from "lucide-react";
+import { ArrowLeftRight, ListOrdered } from "lucide-react";
 import Link from "next/link";
+import { useRouter } from "next/navigation";
 import { useMemo, useState, useTransition } from "react";
 import { toast } from "sonner";
-import { bulkCategorize, loadMore, setCategory } from "@/app/(app)/transactions/actions";
+import { alwaysCategorizeAction, bulkCategorize, loadMore, setCategory } from "@/app/(app)/transactions/actions";
+import { NOT_A_TRANSFER } from "@/lib/transfer-constants";
 import { Button } from "@/components/ui/button";
 import { formatDisplayDate } from "@/lib/dates";
 import { formatCents } from "@/lib/money";
@@ -13,6 +15,9 @@ import type { TransactionFilters, TransactionRow } from "@/server/finance/transa
 import { CategoryOptions, type CategoryOption, CategorySelect } from "./category-select";
 import { QuickAdd } from "./quick-add";
 import { TransactionSheet } from "./transaction-sheet";
+
+/** Both sides of a matched transfer carry the same pair id. */
+const isTransfer = (r: TransactionRow) => r.transferPairId !== null && r.transferPairId !== NOT_A_TRANSFER;
 
 /** The transactions list with selection, bulk categorize, inline edits, and the detail sheet. */
 export function TransactionList({
@@ -60,15 +65,49 @@ export function TransactionList({
     setDetail((d) => (d?.id === row.id ? row : d));
   };
 
+  const router = useRouter();
+
+  /** Re-label rows of one merchant locally after a rule applies to them. */
+  const applyLocally = (merchant: string, categoryId: string) => {
+    const name = categories.find((c) => c.id === categoryId)?.name ?? null;
+    setItems((list) =>
+      list.map((r) =>
+        r.merchant?.toLowerCase() === merchant.toLowerCase() && r.categorizationSource !== "user" && !isTransfer(r)
+          ? { ...r, categoryId, categoryName: name, categorizationSource: "rule", needsReview: false }
+          : r,
+      ),
+    );
+  };
+
   const changeCategory = (row: TransactionRow, categoryId: string | null) => {
     const name = categories.find((c) => c.id === categoryId)?.name ?? null;
-    replace({ ...row, categoryId, categoryName: name });
+    replace({ ...row, categoryId, categoryName: name, categorizationSource: "user", needsReview: false });
     startTransition(async () => {
       const res = await setCategory(row.id, categoryId);
       if ("error" in res) {
         toast.error(res.error);
         replace(row);
-      } else replace(res);
+        return;
+      }
+      replace(res.row);
+      router.refresh();
+      const learned = res.learned;
+      if (learned?.kind === "suggest") {
+        toast(`Always put ${learned.merchant} in ${learned.categoryName}?`, {
+          action: {
+            label: "Always",
+            onClick: async () => {
+              const r = await alwaysCategorizeAction(learned.merchant, learned.categoryId);
+              if ("error" in r) return void toast.error(r.error);
+              applyLocally(learned.merchant, learned.categoryId);
+              router.refresh();
+            },
+          },
+        });
+      } else if (learned?.kind === "ruleCreated") {
+        applyLocally(learned.merchant, res.row.categoryId!);
+        toast.success(`Got it — ${learned.merchant} will always go to ${learned.categoryName}.`);
+      }
     });
   };
 
@@ -187,7 +226,21 @@ export function TransactionList({
                       </div>
                       <div className="flex min-w-0 items-center gap-2">
                         {row.hidden && <span className="rounded-full bg-muted px-2 py-0.5 text-xs text-muted-foreground">Hidden</span>}
-                        <CategorySelect value={row.categoryId} categories={categories} onChange={(id) => changeCategory(row, id)} />
+                        {row.needsReview && !row.hidden && (
+                          <span title="Needs a look" aria-label="Needs a look" className="size-2 shrink-0 rounded-full bg-primary" />
+                        )}
+                        {isTransfer(row) ? (
+                          <button
+                            type="button"
+                            aria-label="Transfer between your accounts"
+                            onClick={() => setDetail(row)}
+                            className="inline-flex items-center gap-1 rounded-full bg-secondary px-2.5 py-0.5 text-xs text-secondary-foreground"
+                          >
+                            <ArrowLeftRight className="size-3" /> Transfer
+                          </button>
+                        ) : (
+                          <CategorySelect value={row.categoryId} categories={categories} onChange={(id) => changeCategory(row, id)} />
+                        )}
                       </div>
                     </div>
                     <p className={cn("num shrink-0 text-right text-sm font-medium", row.amountCents > 0 && "text-positive")}>
@@ -216,6 +269,17 @@ export function TransactionList({
         onClose={() => setDetail(null)}
         onChange={replace}
         onCategory={changeCategory}
+        onUnpaired={(row) => {
+          setItems((list) =>
+            list.map((r) =>
+              r.transferPairId === row.transferPairId
+                ? { ...r, transferPairId: NOT_A_TRANSFER, categoryId: null, categoryName: null, categorizationSource: null, needsReview: true }
+                : r,
+            ),
+          );
+          setDetail(null);
+          router.refresh();
+        }}
         onRemoved={(id) => {
           setItems((list) => list.filter((r) => r.id !== id));
           setDetail(null);

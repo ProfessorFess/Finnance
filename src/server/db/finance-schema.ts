@@ -21,8 +21,7 @@ export type CategorizationSource = "rule" | "history" | "ai" | "user" | "transfe
 export type RuleMatchType = "merchant_equals" | "description_contains" | "regex";
 export type RuleOrigin = "user" | "correction" | "default";
 
-/** transfer_pair_id value meaning "the user said this is not a transfer". */
-export const NOT_A_TRANSFER = "none";
+export { NOT_A_TRANSFER } from "@/lib/transfer-constants";
 
 const id = () =>
   text("id")

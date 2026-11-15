@@ -4,6 +4,8 @@ import { revalidatePath } from "next/cache";
 import { z } from "zod";
 import { parseAmountToCents } from "@/lib/money";
 import { requireUser } from "@/server/auth/session";
+import { alwaysCategorize, chooseCategory, type Learned } from "@/server/categorize/learn";
+import { unpairTransfer } from "@/server/categorize/transfers-service";
 import { getDb } from "@/server/db/client";
 import { NotFoundError, ValidationError } from "@/server/finance/errors";
 import {
@@ -45,12 +47,37 @@ export async function loadMore(filters: TransactionFilters): Promise<{ items: Tr
   }
 }
 
-export async function setCategory(id: string, categoryId: string | null): Promise<TransactionRow | Failure> {
+export async function setCategory(id: string, categoryId: string | null): Promise<{ row: TransactionRow; learned: Learned | null } | Failure> {
   const user = await requireUser();
   try {
-    const row = await updateTransaction(getDb(), user.id, z.string().parse(id), { categoryId: z.string().nullable().parse(categoryId) });
+    const res = await chooseCategory(getDb(), user.id, z.string().parse(id), z.string().nullable().parse(categoryId));
     revalidatePath("/transactions");
-    return row;
+    return res;
+  } catch (err) {
+    return toFailure(err);
+  }
+}
+
+export async function alwaysCategorizeAction(merchant: string, categoryId: string): Promise<{ applied: number } | Failure> {
+  const user = await requireUser();
+  try {
+    const { applied } = await alwaysCategorize(getDb(), user.id, {
+      merchant: z.string().min(1).max(200).parse(merchant),
+      categoryId: z.string().parse(categoryId),
+    });
+    revalidatePath("/transactions");
+    return { applied };
+  } catch (err) {
+    return toFailure(err);
+  }
+}
+
+export async function notATransferAction(id: string): Promise<{ ok: true } | Failure> {
+  const user = await requireUser();
+  try {
+    await unpairTransfer(getDb(), user.id, z.string().parse(id));
+    revalidatePath("/transactions");
+    return { ok: true };
   } catch (err) {
     return toFailure(err);
   }
@@ -137,6 +164,9 @@ const LABELS: Record<string, string> = {
   "transaction.bulk_categorize": "Category changed",
   "transaction.delete": "Deleted",
   "transaction.hide": "Hidden as a duplicate",
+  "transaction.auto_categorize": "Sorted automatically",
+  "transaction.transfer_pair": "Matched as a transfer",
+  "transaction.transfer_unpair": "Marked as not a transfer",
   "transaction.unhide": "Unhidden",
 };
 

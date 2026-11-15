@@ -22,6 +22,7 @@ test("imports UFCU and Ally files together, then skips duplicates on re-upload, 
 
   await page.getByRole("button", { name: "Import 2 files" }).click();
   await expect(ufcu.getByText("5 imported")).toBeVisible();
+  await expect(ufcu.getByRole("link", { name: /need a look/ })).toHaveAttribute("href", "/transactions/review");
   await expect(ally.getByText("3 imported")).toBeVisible();
 
   await page.getByRole("button", { name: "Import more" }).click();

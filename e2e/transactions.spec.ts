@@ -1,5 +1,5 @@
 import { expect, test } from "@playwright/test";
-import { signIn, TXN_USER } from "./fixtures";
+import { LEARN_USER, signIn, TRANSFER_USER, TXN_USER } from "./fixtures";
 
 test.describe.configure({ mode: "serial" });
 
@@ -55,6 +55,36 @@ test("hides a duplicate and can bring it back", async ({ page, isMobile }) => {
   await hiddenRow.getByRole("button", { name: "Details" }).click();
   await page.getByRole("dialog").getByRole("button", { name: "Unhide" }).click();
   await expect(hiddenRow.getByText("Hidden", { exact: true })).toHaveCount(0);
+});
+
+test("learns from a correction and offers to always do it", async ({ page, isMobile }) => {
+  test.skip(isMobile);
+  await page.goto("/sign-in?next=/transactions");
+  await signIn(page, LEARN_USER);
+  const bennu = page.getByRole("listitem").filter({ hasText: "Bennu Coffee" });
+  await bennu.first().getByRole("button", { name: /Category: Uncategorized/ }).click();
+  await page.getByRole("menuitem", { name: "Coffee" }).click();
+  await expect(page.getByText("Always put Bennu Coffee in Coffee?")).toBeVisible();
+  await page.getByRole("button", { name: "Always" }).click();
+  await expect(bennu.getByRole("button", { name: /Category: Coffee/ })).toHaveCount(2);
+});
+
+test("shows where a category came from and lets you undo a transfer pairing", async ({ page, isMobile }) => {
+  test.skip(isMobile);
+  await page.goto("/sign-in?next=/transactions");
+  await signIn(page, TRANSFER_USER);
+  await expect(page.getByText(/transactions? need a look/)).toBeVisible();
+  const prime = page.getByRole("listitem").filter({ hasText: "Prime Video" });
+  await prime.getByRole("button", { name: "Details" }).click();
+  await expect(page.getByRole("dialog").getByText("Sorted by your rule")).toBeVisible();
+  await page.keyboard.press("Escape");
+
+  const withdrawal = page.getByRole("listitem").filter({ hasText: "Withdrawal Internet Banking" });
+  await expect(withdrawal.getByRole("button", { name: "Transfer between your accounts" })).toBeVisible();
+  await withdrawal.getByRole("button", { name: "Details" }).click();
+  await expect(page.getByRole("dialog").getByText("Paired transfer")).toBeVisible();
+  await page.getByRole("dialog").getByRole("button", { name: "Not a transfer" }).click();
+  await expect(withdrawal.getByRole("button", { name: "Transfer between your accounts" })).toHaveCount(0);
 });
 
 test("adds a cash transaction by hand", async ({ page, isMobile }) => {
