@@ -27,19 +27,22 @@ export function CategorySelect({
   categories,
   onChange,
   disabled,
+  label: fixedLabel,
 }: {
   value: string | null;
   categories: CategoryOption[];
   onChange: (categoryId: string | null) => void;
   disabled?: boolean;
+  /** Show this instead of the current category (e.g. "More categories"). */
+  label?: string;
 }) {
   const current = categories.find((c) => c.id === value);
-  const label = current?.name ?? "Uncategorized";
+  const label = fixedLabel ?? current?.name ?? "Uncategorized";
   return (
     <DropdownMenu>
       <DropdownMenuTrigger
         disabled={disabled}
-        aria-label={`Category: ${label}`}
+        aria-label={fixedLabel ?? `Category: ${label}`}
         className={cn(
           "inline-flex max-w-full items-center gap-1 truncate rounded-full border px-2.5 py-0.5 text-xs transition-colors hover:bg-accent",
           current ? "border-transparent bg-secondary text-secondary-foreground" : "border-dashed text-muted-foreground",

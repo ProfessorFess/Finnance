@@ -221,3 +221,20 @@ export async function sortTransactions(
   const summary = await categorizeTransactions(db, userId, { pending: true }, deps);
   return { ...summary, transfers, merchantsFilled: missing.length };
 }
+
+/** Rows Finnance has never tried to sort (imported before automatic sorting existed). */
+export async function countUnsorted(db: Database, userId: string): Promise<number> {
+  const [row] = await db
+    .select({ n: sql<number>`count(*)::int` })
+    .from(transactions)
+    .where(
+      and(
+        eq(transactions.userId, userId),
+        ne(transactions.status, "excluded"),
+        isNull(transactions.transferPairId),
+        isNull(transactions.categorizationSource),
+        eq(transactions.needsReview, false),
+      ),
+    );
+  return row?.n ?? 0;
+}
