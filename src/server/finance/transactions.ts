@@ -1,7 +1,7 @@
 import { randomUUID } from "node:crypto";
 import { and, desc, eq, gte, ilike, inArray, isNull, lte, ne, or, type SQL, sql } from "drizzle-orm";
 import { formatDisplayDate, parseDateValue } from "@/lib/dates";
-import { accounts, type CategorizationSource, categories, type TransactionSource, transactions } from "@/server/db/schema";
+import { accounts, activityLog, type CategorizationSource, categories, type TransactionSource, transactions } from "@/server/db/schema";
 import type { Database, Executor } from "@/server/db/types";
 import { type ActivityEntry, listActivity, logActivity } from "./activity";
 import { NotFoundError, ValidationError } from "./errors";
@@ -213,7 +213,13 @@ export async function updateTransaction(
   await assertCategory(db, userId, patch.categoryId);
 
   const values: Partial<typeof transactions.$inferInsert> = {};
-  if (patch.categoryId !== undefined) values.categoryId = patch.categoryId;
+  if (patch.categoryId !== undefined) {
+    // Setting a category by hand makes it the user's choice: automation won't change it again.
+    values.categoryId = patch.categoryId;
+    values.categorizationSource = "user";
+    values.categorizationConfidence = null;
+    values.needsReview = false;
+  }
   if (patch.notes !== undefined) values.notes = patch.notes?.trim() || null;
   if (patch.description !== undefined) values.rawDescription = patch.description.trim();
   if (patch.date !== undefined) values.date = patch.date;
@@ -244,30 +250,31 @@ export async function setCategoryBulk(
 ): Promise<number> {
   if (ids.length === 0) return 0;
   const owned = await db
-    .select({ id: transactions.id, categoryId: transactions.categoryId })
+    .select({ id: transactions.id, categoryId: transactions.categoryId, source: transactions.categorizationSource })
     .from(transactions)
     .where(and(eq(transactions.userId, userId), inArray(transactions.id, ids)));
   if (owned.length === 0) return 0;
   await assertCategory(db, userId, categoryId);
-  const changed = owned.filter((r) => r.categoryId !== categoryId);
+  const changed = owned.filter((r) => r.categoryId !== categoryId || r.source !== "user");
   if (changed.length === 0) return 0;
 
   await db.transaction(async (tx) => {
     await tx
       .update(transactions)
-      .set({ categoryId })
+      .set({ categoryId, categorizationSource: "user", categorizationConfidence: null, needsReview: false })
       .where(and(eq(transactions.userId, userId), inArray(transactions.id, changed.map((r) => r.id))));
-    for (const r of changed) {
-      await logActivity(tx, {
+    // One insert for all activity rows (fast even for large selections).
+    await tx.insert(activityLog).values(
+      changed.map((r) => ({
         userId,
-        actor: "user",
+        actor: "user" as const,
         action: "transaction.bulk_categorize",
         entityType: "transaction",
         entityId: r.id,
         before: { categoryId: r.categoryId },
         after: { categoryId },
-      });
-    }
+      })),
+    );
   });
   return changed.length;
 }
