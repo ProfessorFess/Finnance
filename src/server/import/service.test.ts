@@ -7,6 +7,7 @@ import { setTrackingStartDate } from "@/server/finance/settings";
 import { createTestDb } from "@/test/db";
 import { fixtureBytes } from "@/test/fixtures";
 import { createTestUser } from "@/test/users";
+import { detectTransfers } from "@/server/categorize/transfers-service";
 import { commitImport, previewImport, undoImport } from "./service";
 
 let t: Awaited<ReturnType<typeof createTestDb>>;
@@ -147,6 +148,16 @@ it("re-imports cleanly after an undo", async () => {
   const first = await commitImport(t.db, A, { file: ufcu(), accountId: checking.id });
   await undoImport(t.db, A, first.batchId);
   expect((await commitImport(t.db, A, { file: ufcu(), accountId: checking.id })).imported).toBe(5);
+});
+
+it("undoing one side of a transfer un-pairs the other side", async () => {
+  const savings = await createAccount(t.db, A, { name: "UFCU Savings", type: "savings", institution: "UFCU", startingBalanceCents: 0 });
+  await commitImport(t.db, A, { file: ufcu(), accountId: checking.id });
+  const sav = await commitImport(t.db, A, { file: { name: "UFCU_Savings_Account.csv", bytes: fixtureBytes("ufcu-savings.csv") }, accountId: savings.id });
+  expect(await detectTransfers(t.db, A)).toBe(1);
+  await undoImport(t.db, A, sav.batchId);
+  const [checkingSide] = await t.db.select().from(transactions).where(eq(transactions.rawDescription, "Withdrawal Internet Banking Transfer To Share 0001 Savings"));
+  expect(checkingSide).toMatchObject({ transferPairId: null, needsReview: true, categoryId: null });
 });
 
 it("requires a tracking start date", async () => {

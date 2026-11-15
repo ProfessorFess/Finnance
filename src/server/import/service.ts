@@ -5,6 +5,7 @@ import { logActivity } from "@/server/finance/activity";
 import { NotFoundError } from "@/server/finance/errors";
 import { getSettings } from "@/server/finance/settings";
 import { normalizeMerchant } from "@/server/categorize/normalize-merchant";
+import { clearDanglingPairs } from "@/server/categorize/transfers-service";
 import { assignOccurrences, dedupeHash } from "./dedupe";
 import { headerSignature } from "./detect";
 import { ImportError } from "./errors";
@@ -269,6 +270,7 @@ export async function undoImport(db: Database, userId: string, batchId: string):
       .where(and(eq(transactions.importBatchId, batchId), eq(transactions.userId, userId)))
       .returning({ id: transactions.id });
     await tx.update(importBatches).set({ undoneAt: new Date() }).where(eq(importBatches.id, batchId));
+    await clearDanglingPairs(tx, userId);
     await logActivity(tx, {
       userId,
       actor: "user",
