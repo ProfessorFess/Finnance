@@ -18,6 +18,7 @@ export const RECURRING_TRACK_USER = { name: "E2E Recurring Track", email: "recur
 export const RECURRING_LOG_USER = { name: "E2E Recurring Log", email: "recurring-log@e2e.test", password: "e2e-recurring-log-pw-12" };
 export const PLAN_USER = { name: "E2E Plan", email: "plan@e2e.test", password: "e2e-plan-password-1234" };
 export const PLAN_SCRATCH_USER = { name: "E2E Plan Scratch", email: "plan-scratch@e2e.test", password: "e2e-plan-scratch-pw-12" };
+export const PLAN_EDIT_USER = { name: "E2E Plan Edit", email: "plan-edit@e2e.test", password: "e2e-plan-edit-pw-1234" };
 export const OWNER_STATE = "e2e/.auth/owner.json";
 
 const octet = () => Math.floor(Math.random() * 254) + 1;

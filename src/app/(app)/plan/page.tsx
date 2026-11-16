@@ -9,6 +9,7 @@ import { getDb } from "@/server/db/client";
 import { listAccounts } from "@/server/finance/accounts";
 import { listCategories } from "@/server/finance/categories";
 import { getSettings } from "@/server/finance/settings";
+import { getActivePlan } from "@/server/plan/plans-service";
 import { getPlanStatus } from "@/server/plan/status-service";
 import { PLAN_TEMPLATES, templateDrafts } from "@/server/plan/templates";
 import type { IncomeSource } from "@/server/recurring/items-service";
@@ -51,10 +52,19 @@ export default async function PlanPage() {
     const incomes = overview.income
       .filter((v) => status.incomes.some((i) => i.id === v.item.id))
       .map((v) => ({ id: v.item.id, name: v.name, accountId: v.item.accountId }));
+    const active = await getActivePlan(db, user.id);
+    const rule = active?.rules.find((r) => r.type === "extra_income");
     return (
       <div className="rise">
         <PageHeader title="Plan" description={status.plan.name} />
-        <PlanBoard status={status} incomes={incomes} accounts={accountOptions} />
+        <PlanBoard
+          status={status}
+          incomes={incomes}
+          allIncomes={overview.income.map((v) => ({ id: v.item.id, name: v.name, scheduled: v.frequency !== "irregular" }))}
+          accounts={accountOptions}
+          categories={categories.map((c) => ({ id: c.id, name: c.name, groupName: c.groupName }))}
+          extraRule={rule ? { bucketId: rule.bucketId, incomeSourceId: rule.incomeSourceId } : null}
+        />
       </div>
     );
   }

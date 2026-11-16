@@ -9,6 +9,9 @@ import { createAccount } from "../src/server/finance/accounts";
 import { setTrackingStartDate } from "../src/server/finance/settings";
 import { commitImport } from "../src/server/import/service";
 import { createIncomeSource, createRecurringRule } from "../src/server/recurring/items-service";
+import { listCategories } from "../src/server/finance/categories";
+import { createPlan } from "../src/server/plan/plans-service";
+import { templateDrafts } from "../src/server/plan/templates";
 import * as schema from "../src/server/db/schema";
 import { assertSafeE2EDatabase } from "../src/test/e2e-db-guard";
 import { insertTestTransaction } from "../src/test/users";
@@ -21,6 +24,7 @@ import {
   OWNER,
   REVIEW_USER,
   REVIEW_USER_M,
+  PLAN_EDIT_USER,
   PLAN_SCRATCH_USER,
   PLAN_USER,
   RECURRING_LOG_USER,
@@ -93,6 +97,24 @@ export default async function globalSetup() {
   await createRecurringRule(db, planUser.id, {
     name: "Prime Video", kind: "subscription", frequency: "monthly", anchorDate: "2026-11-14", secondDay: null, expectedCents: 2164,
     amountVaries: false, toleranceCents: null, accountId: planUser.accounts[0]!.id, categoryId: null, matchPattern: "Prime Video",
+  });
+  const editUser = await seeded(PLAN_EDIT_USER, [CHECKING]);
+  const editSav = await createAccount(db, editUser.id, { name: "Ally Savings", type: "savings", institution: "Ally", startingBalanceCents: 0 });
+  const editSpend = await createAccount(db, editUser.id, { name: "Ally Spending", type: "checking", institution: "Ally", startingBalanceCents: 0 });
+  const editPay = await createIncomeSource(db, editUser.id, {
+    name: "Paycheck", type: "salary", frequency: "biweekly", anchorDate: "2026-11-14", secondDay: null, amountMode: "fixed",
+    expectedCents: 120000, accountId: editUser.accounts[0]!.id, categoryId: null, matchPattern: "Payroll Acme Corp",
+  });
+  await createRecurringRule(db, editUser.id, {
+    name: "Prime Video", kind: "subscription", frequency: "monthly", anchorDate: "2026-11-14", secondDay: null, expectedCents: 2164,
+    amountVaries: false, toleranceCents: null, accountId: editUser.accounts[0]!.id, categoryId: null, matchPattern: "Prime Video",
+  });
+  const editDrafts = templateDrafts("paycheck_plan", await listCategories(db, editUser.id));
+  editDrafts.buckets[0] = { ...editDrafts.buckets[0]!, fundingCents: 40000, destinationAccountId: editSav.id };
+  editDrafts.buckets[2] = { ...editDrafts.buckets[2]!, fundingCents: 40000, limitCents: 20000, destinationAccountId: editSpend.id };
+  await createPlan(db, editUser.id, {
+    template: "paycheck_plan", cadence: "per_income", name: "Paycheck plan", incomeSourceIds: [editPay.id],
+    buckets: editDrafts.buckets, extraIncome: { bucketIndex: 0, incomeSourceId: editPay.id },
   });
   const scratchUser = await seeded(PLAN_SCRATCH_USER, [CHECKING]);
   await createIncomeSource(db, scratchUser.id, {

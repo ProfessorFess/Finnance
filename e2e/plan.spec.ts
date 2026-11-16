@@ -1,5 +1,5 @@
 import { expect, test } from "@playwright/test";
-import { PLAN_SCRATCH_USER, PLAN_USER, signIn } from "./fixtures";
+import { PLAN_EDIT_USER, PLAN_SCRATCH_USER, PLAN_USER, signIn } from "./fixtures";
 
 test("creates the paycheck plan and shows the buckets", async ({ page, isMobile }) => {
   test.skip(isMobile, "stateful flow runs on desktop");
@@ -35,4 +35,18 @@ test("starts from scratch with a monthly plan", async ({ page, isMobile }) => {
   await expect(page.getByRole("heading", { name: "Whatever's left", exact: true })).toBeVisible();
   await expect(page.getByText("Fully allocated")).toBeVisible();
   await expect(page.getByRole("region", { name: "Income" }).getByText(/paycheck/i)).toHaveCount(0);
+});
+
+test("edits a bucket and sees the health check change", async ({ page, isMobile }) => {
+  test.skip(isMobile, "stateful flow runs on desktop");
+  await page.goto("/sign-in?next=/plan");
+  await signIn(page, PLAN_EDIT_USER);
+  await expect(page.getByText("Fully allocated")).toBeVisible();
+  await page.getByRole("button", { name: "Edit plan" }).click();
+  await page.getByRole("button", { name: "Edit Weekly spending" }).click();
+  const dialog = page.getByRole("dialog");
+  await dialog.getByLabel("Amount", { exact: true }).fill("900");
+  await dialog.getByRole("button", { name: "Save" }).click();
+  await expect(dialog).toBeHidden();
+  await expect(page.getByText(/Over by/)).toBeVisible();
 });
