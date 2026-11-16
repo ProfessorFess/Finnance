@@ -88,17 +88,24 @@ export async function unpairTransfer(db: Database, userId: string, transactionId
       : [transactionId];
 
   await db.transaction(async (tx) => {
+    const these = and(eq(transactions.userId, userId), inArray(transactions.id, ids));
+    // Clear what transfer matching set; keep any category the user chose themselves.
     await tx
       .update(transactions)
       .set({ transferPairId: NOT_A_TRANSFER, categoryId: null, categorizationSource: null, categorizationConfidence: null, needsReview: true })
-      .where(and(eq(transactions.userId, userId), inArray(transactions.id, ids)));
+      .where(and(these, eq(transactions.categorizationSource, "transfer")));
+    await tx.update(transactions).set({ transferPairId: NOT_A_TRANSFER }).where(these);
     for (const id of ids) {
       await logActivity(tx, { userId, actor: "user", action: "transaction.transfer_unpair", entityType: "transaction", entityId: id, before: { transferPairId: row.pairId } });
     }
   });
 }
 
-/** Resets rows whose transfer partner no longer exists (e.g. after an import was undone). */
+/**
+ * Resets rows whose transfer partner no longer exists (e.g. after an import was
+ * undone or the user re-categorized the other side). Only categories set by
+ * transfer matching are cleared; a category the user chose is kept.
+ */
 export async function clearDanglingPairs(db: Executor, userId: string): Promise<number> {
   const lonely = await db
     .select({ pairId: transactions.transferPairId })
@@ -108,10 +115,16 @@ export async function clearDanglingPairs(db: Executor, userId: string): Promise<
     .having(sql`count(*) < 2`);
   const pairIds = lonely.map((l) => l.pairId!).filter(Boolean);
   if (pairIds.length === 0) return 0;
+  const inPairs = and(eq(transactions.userId, userId), inArray(transactions.transferPairId, pairIds));
   const reset = await db
     .update(transactions)
     .set({ transferPairId: null, categoryId: null, categorizationSource: null, categorizationConfidence: null, needsReview: true })
-    .where(and(eq(transactions.userId, userId), inArray(transactions.transferPairId, pairIds)))
+    .where(and(inPairs, eq(transactions.categorizationSource, "transfer")))
     .returning({ id: transactions.id });
-  return reset.length;
+  const kept = await db
+    .update(transactions)
+    .set({ transferPairId: null })
+    .where(inPairs)
+    .returning({ id: transactions.id });
+  return reset.length + kept.length;
 }

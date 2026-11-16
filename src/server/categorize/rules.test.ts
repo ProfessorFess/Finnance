@@ -1,5 +1,5 @@
 import { expect, it } from "vitest";
-import { matchRule, type RuleLike } from "./rules";
+import { DEFAULT_RULES, matchRule, type RuleLike } from "./rules";
 
 const r = (p: Partial<RuleLike>): RuleLike => ({
   id: crypto.randomUUID(), matchType: "description_contains", pattern: "x", categoryId: "c",
@@ -25,4 +25,17 @@ it("ignores an invalid regex", () => {
 
 it("matches regex rules case-insensitively", () => {
   expect(matchRule([r({ matchType: "regex", pattern: "\\bATM\\b" })], { merchant: null, description: "atm withdrawal" })).not.toBeNull();
+});
+
+it("built-in rules match whole words, not pieces of other names", () => {
+  const builtIns = DEFAULT_RULES.map((d) => r({ matchType: d.matchType, pattern: d.pattern, categoryId: d.category, priority: d.priority }));
+  const cat = (description: string) => matchRule(builtIns, { merchant: description, description })?.categoryId ?? null;
+  expect(cat("Huber's Hardware")).toBeNull();
+  expect(cat("Shelley's Salon")).toBeNull();
+  expect(cat("Peacock Cafe")).toBe("Subscriptions"); // whole word: still a known false positive, documented
+  expect(cat("UBER *TRIP HELP.UBER.COM")).toBe("Rideshare & transit");
+  expect(cat("SHELL OIL 57444")).toBe("Gas & fuel");
+  expect(cat("Uber Eats")).toBe("Restaurants");
+  expect(cat("H-E-B #123")).toBe("Groceries");
+  expect(cat("DISNEY+ 888-905-7888")).toBe("Subscriptions");
 });

@@ -10,6 +10,7 @@ import { setTrackingStartDate } from "../src/server/finance/settings";
 import { commitImport } from "../src/server/import/service";
 import * as schema from "../src/server/db/schema";
 import { assertSafeE2EDatabase } from "../src/test/e2e-db-guard";
+import { insertTestTransaction } from "../src/test/users";
 import { E2E_ENV } from "./env";
 import {
   ACCOUNTS_USER,
@@ -20,6 +21,7 @@ import {
   REVIEW_USER,
   REVIEW_USER_M,
   RULES_USER,
+  SORT_USER,
   TRANSFER_USER,
   TWOFA_USER,
   TXN_USER,
@@ -63,6 +65,14 @@ export default async function globalSetup() {
   await seeded(REVIEW_USER, [CHECKING]);
   await seeded(REVIEW_USER_M, [CHECKING]);
   await seeded(RULES_USER, [CHECKING]);
+
+  // Rows as Phase 1a left them: never sorted (no source, no merchant, not flagged for review).
+  const sortUser = await createOwner(auth, SORT_USER);
+  await setTrackingStartDate(db, sortUser.id, "2026-11-07");
+  const sortAcct = await createAccount(db, sortUser.id, { name: "UFCU Checking", type: "checking", institution: "UFCU", startingBalanceCents: 0 });
+  for (const description of ["Haymaker", "Corner Store", "Starbucks"]) {
+    await insertTestTransaction(db, sortUser.id, sortAcct.id, { amountCents: -700, date: "2026-11-10", description });
+  }
   await createOwner(auth, NOSTART_USER);
   await pool.end();
 }

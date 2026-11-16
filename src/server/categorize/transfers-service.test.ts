@@ -6,7 +6,8 @@ import { listCategories } from "@/server/finance/categories";
 import { NotFoundError } from "@/server/finance/errors";
 import { createTestDb } from "@/test/db";
 import { createTestUser, insertTestTransaction } from "@/test/users";
-import { detectTransfers, unpairTransfer } from "./transfers-service";
+import { setCategoryBulk, updateTransaction } from "@/server/finance/transactions";
+import { clearDanglingPairs, detectTransfers, unpairTransfer } from "./transfers-service";
 
 let t: Awaited<ReturnType<typeof createTestDb>>;
 let A: string;
@@ -69,4 +70,33 @@ it("isolates users", async () => {
   expect(await detectTransfers(t.db, B)).toBe(0);
   const { out } = await zellePair();
   await expect(unpairTransfer(t.db, B, out.id)).rejects.toThrow(NotFoundError);
+});
+
+it("hand-setting a category on a paired row un-pairs it and sends the partner to review", async () => {
+  const { out, inn } = await zellePair();
+  await detectTransfers(t.db, A);
+  const gifts = (await listCategories(t.db, A)).find((c) => c.name === "Gifts")!;
+  await updateTransaction(t.db, A, out.id, { categoryId: gifts.id });
+  const [a, b] = await rows([out.id, inn.id]);
+  expect(a).toMatchObject({ transferPairId: NOT_A_TRANSFER, categoryId: gifts.id, categorizationSource: "user" });
+  expect(b).toMatchObject({ transferPairId: null, categoryId: null, needsReview: true });
+});
+
+it("bulk-categorizing a paired row un-pairs it too", async () => {
+  const { out, inn } = await zellePair();
+  await detectTransfers(t.db, A);
+  const gifts = (await listCategories(t.db, A)).find((c) => c.name === "Gifts")!;
+  await setCategoryBulk(t.db, A, [out.id], gifts.id);
+  const [a, b] = await rows([out.id, inn.id]);
+  expect(a).toMatchObject({ transferPairId: NOT_A_TRANSFER, categoryId: gifts.id });
+  expect(b!.transferPairId).toBeNull();
+});
+
+it("cleaning up a broken pair keeps a category the user chose", async () => {
+  const { out } = await zellePair();
+  const gifts = (await listCategories(t.db, A)).find((c) => c.name === "Gifts")!;
+  await t.db.update(transactions).set({ transferPairId: "lonely-pair", categoryId: gifts.id, categorizationSource: "user" }).where(eq(transactions.id, out.id));
+  await clearDanglingPairs(t.db, A);
+  const [a] = await rows([out.id]);
+  expect(a).toMatchObject({ transferPairId: null, categoryId: gifts.id, categorizationSource: "user" });
 });

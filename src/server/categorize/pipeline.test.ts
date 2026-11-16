@@ -9,7 +9,8 @@ import { setTrackingStartDate } from "@/server/finance/settings";
 import { createTestDb } from "@/test/db";
 import { createTestUser, insertTestTransaction } from "@/test/users";
 import type { AiCategorizer, AiItem } from "./ai-categorizer";
-import { categorizeTransactions, sortTransactions } from "./pipeline";
+import { createManualTransaction } from "@/server/finance/transactions";
+import { categorizeTransactions, countUnsorted, sortTransactions } from "./pipeline";
 
 let t: Awaited<ReturnType<typeof createTestDb>>;
 let A: string;
@@ -137,4 +138,34 @@ it("backfills merchants, transfers and categories for rows imported before 1b", 
   expect(s.merchantsFilled).toBe(3);
   expect(await get(prime.id)).toMatchObject({ merchant: "Prime Video", categoryId: (await cat("Subscriptions")).id });
   expect((await get(out.id)).transferPairId).toBe((await get(inn.id)).transferPairId);
+});
+
+it("Sort now doesn't re-send rows the AI already looked at", async () => {
+  const row = await add("Mystery Shop");
+  await t.db.update(transactions).set({ categorizationSource: "ai", needsReview: true, categorizationConfidence: 0.3 }).where(eq(transactions.id, row.id));
+  await sortTransactions(t.db, A, { ai: fakeAi({}), now });
+  expect(aiCalls).toHaveLength(0);
+});
+
+it("Sort now offers rows that never reached the AI once a key exists", async () => {
+  const row = await add("Haymaker");
+  await t.db.update(transactions).set({ categorizationSource: null, needsReview: true }).where(eq(transactions.id, row.id));
+  await sortTransactions(t.db, A, { ai: fakeAi({ Haymaker: "Restaurants" }), now });
+  expect(aiCalls).toHaveLength(1);
+});
+
+it("ignores rows before the tracking start date", async () => {
+  const early = await insertTestTransaction(t.db, A, acct.id, { amountCents: -500, date: "2026-10-20", description: "Haymaker" });
+  expect(await countUnsorted(t.db, A)).toBe(0);
+  await sortTransactions(t.db, A, { ai: fakeAi({ Haymaker: "Restaurants" }), now });
+  expect(aiCalls).toHaveLength(0);
+  expect(await get(early.id)).toMatchObject({ categorizationSource: null, categoryId: null });
+});
+
+it("sorts a new cash entry when it's added", async () => {
+  const starbucks = await createManualTransaction(t.db, A, { accountId: acct.id, date: "2026-11-10", description: "Starbucks", amountCents: -500 });
+  const unknown = await createManualTransaction(t.db, A, { accountId: acct.id, date: "2026-11-10", description: "Haymaker", amountCents: -900 });
+  expect(await get(starbucks.id)).toMatchObject({ categoryId: (await cat("Coffee")).id, categorizationSource: "rule" });
+  expect(await get(unknown.id)).toMatchObject({ needsReview: true });
+  expect(await countUnsorted(t.db, A)).toBe(0);
 });

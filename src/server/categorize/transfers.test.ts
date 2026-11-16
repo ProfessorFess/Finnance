@@ -34,3 +34,24 @@ it("never pairs within one account or beyond 5 days", () => {
   expect(pairTransfers([row("o", "a", "2026-11-01", -100, "Transfer To Share 01"), row("i", "a", "2026-11-01", 100, "Transfer From Share 01")])).toEqual([]);
   expect(pairTransfers([row("o", "a", "2026-11-01", -100, "Transfer To Share 01"), row("i", "b", "2026-11-07", 100, "Transfer From Share 01")])).toEqual([]);
 });
+
+it("does not pair Zelle payments with two different people", () => {
+  expect(pairTransfers([
+    row("o", "ufcu", "2026-11-03", -4000, "Zelle transfer to NATHAN KINNAMAN"),
+    row("i", "ally", "2026-11-05", 4000, "Zelle payment from TAJA ROGERS to A Sample (Ally Spending Account XXXXXX0000)"),
+  ])).toEqual([]);
+});
+
+it("pairs your own Zelle even when one bank adds a middle initial", () => {
+  expect(pairTransfers([
+    row("o", "ally", "2026-11-03", -2500, "Zelle payment from Alex Q Sample (Ally Spending Account XXXXXX0000) to ALEX SAMPLE"),
+    row("i", "ufcu", "2026-11-04", 2500, "Zelle transfer from ALEX SAMPLE"),
+  ])).toEqual([["o", "i"]]);
+});
+
+it("does not pair a Zelle with a non-Zelle transfer", () => {
+  expect(pairTransfers([
+    row("o", "ufcu", "2026-11-03", -5000, "Withdrawal Internet Banking Transfer To Share 0080"),
+    row("i", "ally", "2026-11-03", 5000, "Zelle payment from TAJA ROGERS to A Sample"),
+  ])).toEqual([]);
+});

@@ -77,7 +77,7 @@ export function createAnthropicCategorizer(opts: { apiKey?: string; client?: Pic
     const response = await client.messages.parse(
       {
         model,
-        max_tokens: 4096,
+        max_tokens: 16_000, // room for thinking plus 50 results; truncation would send the batch to review
         system: [{ type: "text", text: prompt.text, cache_control: { type: "ephemeral" } }],
         output_config: { effort: "low", format: zodOutputFormat(OutputSchema) },
         messages: [

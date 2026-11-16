@@ -16,7 +16,7 @@ export function AddRuleForm({ categories }: { categories: CategoryOption[] }) {
   return (
     <section className="rounded-2xl border bg-card p-5 shadow-xs">
       <h2 className="font-semibold">Add a rule</h2>
-      <p className="mt-1 text-sm text-muted-foreground">Any transaction whose merchant or description contains this text goes to the category.</p>
+      <p className="mt-1 text-sm text-muted-foreground">Any transaction whose merchant or description contains this word or phrase goes to the category.</p>
       <form
         ref={formRef}
         className="mt-4 flex flex-col gap-3 sm:flex-row sm:items-end"

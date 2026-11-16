@@ -15,8 +15,12 @@ function matches(rule: RuleLike, t: { merchant: string | null; description: stri
   switch (rule.matchType) {
     case "merchant_equals":
       return (t.merchant ?? "").toLowerCase() === pattern;
-    case "description_contains":
-      return t.description.toLowerCase().includes(pattern) || (t.merchant ?? "").toLowerCase().includes(pattern);
+    case "description_contains": {
+      // Whole words only, so "uber" doesn't match "Huber's" and "shell" doesn't match "Shelley's".
+      const escaped = pattern.replace(/[.*+?^${}()|[\]\\]/g, "\\$&");
+      const re = new RegExp(`(?<![a-z0-9])${escaped}(?![a-z0-9])`, "i");
+      return re.test(t.description) || re.test(t.merchant ?? "");
+    }
     case "regex":
       try {
         return new RegExp(rule.pattern, "i").test(t.description);

@@ -6,7 +6,7 @@ import { requireUser } from "@/server/auth/session";
 import { countUnsorted } from "@/server/categorize/pipeline";
 import { getDb } from "@/server/db/client";
 import { listCategories } from "@/server/finance/categories";
-import { listTransactions } from "@/server/finance/transactions";
+import { countNeedsReview, listTransactions } from "@/server/finance/transactions";
 
 export const metadata = { title: "Review · Finnance" };
 
@@ -17,10 +17,11 @@ const POPULAR_IN = ["Paycheck", "Refunds", "Interest", "Other income"];
 export default async function ReviewPage() {
   const user = await requireUser();
   const db = getDb();
-  const [{ items }, categories, unsorted] = await Promise.all([
+  const [{ items }, categories, unsorted, total] = await Promise.all([
     listTransactions(db, user.id, { needsReview: true, limit: 50 }),
     listCategories(db, user.id),
     countUnsorted(db, user.id),
+    countNeedsReview(db, user.id),
   ]);
   const options = categories.map((c) => ({ id: c.id, name: c.name, groupName: c.groupName }));
   const ids = (names: string[]) => names.map((n) => categories.find((c) => c.name === n)?.id).filter((id): id is string => Boolean(id));
@@ -32,7 +33,15 @@ export default async function ReviewPage() {
         <ChevronLeft className="size-4" /> Transactions
       </Link>
       <PageHeader title="Review" description="Help Finnance sort what it wasn't sure about." />
-      <ReviewDeck rows={items} categories={options} popular={popular} unsorted={unsorted} />
+      {/* Keyed on the rows so a refresh (after "Sort now" or "Keep going") starts a fresh deck. */}
+      <ReviewDeck
+        key={items.map((i) => i.id).join(",")}
+        rows={items}
+        categories={options}
+        popular={popular}
+        unsorted={unsorted}
+        remaining={Math.max(0, total - items.length)}
+      />
     </div>
   );
 }

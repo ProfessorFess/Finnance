@@ -51,6 +51,8 @@ it("sends a cached system prompt to Haiku at low effort with structured output",
   const out = await ai({ categories: cats, examples: [], items: [item("r1")] });
   const [body, opts] = parse.mock.calls[0]!;
   expect(body).toMatchObject({ model: "claude-haiku-5-5", output_config: { effort: "low" } });
+  // Haiku thinks within max_tokens; 50 results plus thinking must fit without truncation.
+  expect(body.max_tokens).toBeGreaterThanOrEqual(16_000);
   expect(body.system[0].cache_control).toEqual({ type: "ephemeral" });
   expect(body).not.toHaveProperty("temperature");
   expect(body).not.toHaveProperty("thinking");

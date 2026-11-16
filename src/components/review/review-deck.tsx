@@ -25,11 +25,14 @@ export function ReviewDeck({
   categories,
   popular,
   unsorted,
+  remaining,
 }: {
   rows: TransactionRow[];
   categories: CategoryOption[];
   popular: { out: string[]; in: string[] };
   unsorted: number;
+  /** Rows needing review beyond the ones loaded (the page loads 50 at a time). */
+  remaining: number;
 }) {
   const router = useRouter();
   const [queue, setQueue] = useState(rows);
@@ -193,6 +196,14 @@ export function ReviewDeck({
           </article>
           <p className="text-center text-xs text-muted-foreground">Swipe right to accept the suggestion, left to skip.</p>
         </>
+      ) : remaining > 0 ? (
+        <section className="rounded-2xl border bg-card px-6 py-12 text-center shadow-xs">
+          <h2 className="text-xl font-semibold">Nice work</h2>
+          <p className="mt-1 text-sm text-muted-foreground">{remaining} more need a look.</p>
+          <Button className="mt-5" onClick={() => router.refresh()}>
+            Keep going
+          </Button>
+        </section>
       ) : (
         <section className="rounded-2xl border bg-card px-6 py-12 text-center shadow-xs">
           <CheckCheck className="mx-auto size-8 text-positive" />

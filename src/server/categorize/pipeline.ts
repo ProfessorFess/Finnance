@@ -1,8 +1,9 @@
-import { and, desc, eq, inArray, isNotNull, isNull, ne, or, sql } from "drizzle-orm";
+import { and, desc, eq, gte, inArray, isNotNull, isNull, ne, or, sql } from "drizzle-orm";
 import { recordAiUsage, canSpendAi } from "@/server/ai/usage";
 import { activityLog, categories, NOT_A_TRANSFER, transactions } from "@/server/db/schema";
 import type { Database } from "@/server/db/types";
 import { listCategories } from "@/server/finance/categories";
+import { getTrackingStartDate } from "@/server/finance/settings";
 import type { AiCategorizer, AiExample, AiItem, AiResult } from "./ai-categorizer";
 import { normalizeMerchant } from "./normalize-merchant";
 import { matchRule } from "./rules";
@@ -80,15 +81,17 @@ export async function categorizeTransactions(
   scope: { ids: string[] } | { pending: true },
   deps: CategorizeDeps,
 ): Promise<CategorizeSummary> {
+  // Only rows nothing has sorted yet. Rows the AI already looked at stay in review
+  // for the user (re-sending them would spend money for the same answer), and rows
+  // before the tracking start date are outside tracking.
   const conds = [
     eq(transactions.userId, userId),
     ne(transactions.status, "excluded"),
     or(isNull(transactions.transferPairId), eq(transactions.transferPairId, NOT_A_TRANSFER)),
-    or(
-      isNull(transactions.categorizationSource),
-      and(inArray(transactions.categorizationSource, ["ai", "history", "rule"]), eq(transactions.needsReview, true)),
-    ),
+    isNull(transactions.categorizationSource),
   ];
+  const startDate = await getTrackingStartDate(db, userId);
+  if (startDate) conds.push(gte(transactions.date, startDate));
   if ("ids" in scope) {
     if (scope.ids.length === 0) return { byRule: 0, byHistory: 0, byAi: 0, needsReview: 0 };
     conds.push(inArray(transactions.id, scope.ids));
@@ -224,6 +227,7 @@ export async function sortTransactions(
 
 /** Rows Finnance has never tried to sort (imported before automatic sorting existed). */
 export async function countUnsorted(db: Database, userId: string): Promise<number> {
+  const startDate = await getTrackingStartDate(db, userId);
   const [row] = await db
     .select({ n: sql<number>`count(*)::int` })
     .from(transactions)
@@ -234,6 +238,7 @@ export async function countUnsorted(db: Database, userId: string): Promise<numbe
         isNull(transactions.transferPairId),
         isNull(transactions.categorizationSource),
         eq(transactions.needsReview, false),
+        ...(startDate ? [gte(transactions.date, startDate)] : []),
       ),
     );
   return row?.n ?? 0;

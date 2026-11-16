@@ -5,6 +5,9 @@ import { accounts, activityLog, type CategorizationSource, categories, type Tran
 import type { Database, Executor } from "@/server/db/types";
 import { type ActivityEntry, listActivity, logActivity } from "./activity";
 import { NotFoundError, ValidationError } from "./errors";
+import { categorizeTransactions } from "@/server/categorize/pipeline";
+import { clearDanglingPairs } from "@/server/categorize/transfers-service";
+import { NOT_A_TRANSFER } from "@/lib/transfer-constants";
 import { getTrackingStartDate } from "./settings";
 
 export type TransactionFilters = {
@@ -185,7 +188,7 @@ export async function createManualTransaction(
   if (!Number.isSafeInteger(input.amountCents) || input.amountCents === 0) throw new ValidationError("Enter an amount");
   await assertCategory(db, userId, input.categoryId);
 
-  return db.transaction(async (tx) => {
+  const created = await db.transaction(async (tx) => {
     const [created] = await tx
       .insert(transactions)
       .values({
@@ -195,6 +198,8 @@ export async function createManualTransaction(
         amountCents: input.amountCents,
         rawDescription: description,
         categoryId: input.categoryId ?? null,
+        // A category picked while adding the entry is the user's choice.
+        categorizationSource: input.categoryId ? "user" : null,
         notes: input.notes?.trim() || null,
         source: "manual",
         dedupeHash: `manual:${randomUUID()}`,
@@ -204,6 +209,13 @@ export async function createManualTransaction(
     await logActivity(tx, { userId, actor: "user", action: "transaction.create", entityType: "transaction", entityId: row.id, after: row });
     return row;
   });
+  // Sort a new entry right away with rules and past choices (no AI for one row);
+  // anything they can't place goes to review instead of waiting for "Sort now".
+  if (!input.categoryId) {
+    await categorizeTransactions(db, userId, { ids: [created.id] }, { ai: null });
+    return toRow(await getRow(db, userId, created.id));
+  }
+  return created;
 }
 
 /** Edits a transaction. Imported rows keep the bank's date and amount. */
@@ -228,6 +240,8 @@ export async function updateTransaction(
     values.categorizationSource = "user";
     values.categorizationConfidence = null;
     values.needsReview = false;
+    // A category chosen for one side of a transfer means it isn't one; the partner goes to review.
+    if (before.transferPairId && before.transferPairId !== NOT_A_TRANSFER) values.transferPairId = NOT_A_TRANSFER;
   }
   if (patch.notes !== undefined) values.notes = patch.notes?.trim() || null;
   if (patch.description !== undefined) values.rawDescription = patch.description.trim();
@@ -236,6 +250,7 @@ export async function updateTransaction(
 
   return db.transaction(async (tx) => {
     await tx.update(transactions).set(values).where(and(eq(transactions.id, id), eq(transactions.userId, userId)));
+    if (values.transferPairId === NOT_A_TRANSFER) await clearDanglingPairs(tx, userId);
     const after = toRow(await getRow(tx, userId, id));
     await logActivity(tx, {
       userId,
@@ -259,7 +274,7 @@ export async function setCategoryBulk(
 ): Promise<number> {
   if (ids.length === 0) return 0;
   const owned = await db
-    .select({ id: transactions.id, categoryId: transactions.categoryId, source: transactions.categorizationSource })
+    .select({ id: transactions.id, categoryId: transactions.categoryId, source: transactions.categorizationSource, pairId: transactions.transferPairId })
     .from(transactions)
     .where(and(eq(transactions.userId, userId), inArray(transactions.id, ids)));
   if (owned.length === 0) return 0;
@@ -272,6 +287,14 @@ export async function setCategoryBulk(
       .update(transactions)
       .set({ categoryId, categorizationSource: "user", categorizationConfidence: null, needsReview: false })
       .where(and(eq(transactions.userId, userId), inArray(transactions.id, changed.map((r) => r.id))));
+    const paired = changed.filter((r) => r.pairId && r.pairId !== NOT_A_TRANSFER).map((r) => r.id);
+    if (paired.length) {
+      await tx
+        .update(transactions)
+        .set({ transferPairId: NOT_A_TRANSFER })
+        .where(and(eq(transactions.userId, userId), inArray(transactions.id, paired)));
+      await clearDanglingPairs(tx, userId);
+    }
     // One insert for all activity rows (fast even for large selections).
     await tx.insert(activityLog).values(
       changed.map((r) => ({

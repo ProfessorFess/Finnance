@@ -11,6 +11,7 @@ export const TRANSFER_USER = { name: "E2E Transfer", email: "transfer@e2e.test",
 export const LEARN_USER = { name: "E2E Learn", email: "learn@e2e.test", password: "e2e-learn-password-123" };
 export const REVIEW_USER = { name: "E2E Review", email: "review@e2e.test", password: "e2e-review-password-12" };
 export const REVIEW_USER_M = { name: "E2E Review Mobile", email: "review-m@e2e.test", password: "e2e-review-m-password-1" };
+export const SORT_USER = { name: "E2E Sort", email: "sort@e2e.test", password: "e2e-sort-password-1234" };
 export const RULES_USER = { name: "E2E Rules", email: "rules@e2e.test", password: "e2e-rules-password-123" };
 export const OWNER_STATE = "e2e/.auth/owner.json";
 
