@@ -24,6 +24,8 @@ import {
   OWNER,
   REVIEW_USER,
   REVIEW_USER_M,
+  GOALS_ORDER_USER,
+  GOALS_USER,
   PLAN_EDIT_USER,
   PLAN_SCRATCH_USER,
   PLAN_TWO_USER,
@@ -135,6 +137,11 @@ export default async function globalSetup() {
     name: "Side gigs", type: "side_income", frequency: "irregular", anchorDate: null, secondDay: null, amountMode: "varies",
     expectedCents: 50000, accountId: scratchUser.accounts[0]!.id, categoryId: null, matchPattern: "Venmo",
   });
+
+  // Goals: an account to save into.
+  const goalsUser = await seeded(GOALS_USER, [CHECKING]);
+  await createAccount(db, goalsUser.id, { name: "Ally Savings", type: "savings", institution: "Ally", startingBalanceCents: 0 });
+  await seeded(GOALS_ORDER_USER, [CHECKING]);
 
   // Rows as Phase 1a left them: never sorted (no source, no merchant, not flagged for review).
   const sortUser = await createOwner(auth, SORT_USER);

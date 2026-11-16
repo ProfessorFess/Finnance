@@ -1,0 +1,39 @@
+import { expect, test } from "@playwright/test";
+import { GOALS_ORDER_USER, GOALS_USER, signIn } from "./fixtures";
+
+test("adds a goal and money by hand", async ({ page, isMobile }) => {
+  test.skip(isMobile, "stateful flow runs on desktop");
+  await page.goto("/sign-in?next=/goals");
+  await signIn(page, GOALS_USER);
+  await page.getByRole("button", { name: "Add goal" }).first().click();
+  const dialog = page.getByRole("dialog");
+  await dialog.getByLabel("Name").fill("Emergency fund");
+  await dialog.getByLabel("Target", { exact: true }).fill("10000");
+  await dialog.getByLabel("Already saved").fill("2500");
+  await dialog.getByLabel("Plan to add").fill("800");
+  await dialog.getByRole("button", { name: "Save" }).click();
+  await expect(dialog).toBeHidden();
+  const card = page.getByRole("listitem").filter({ hasText: "Emergency fund" });
+  await expect(card.getByText("$2,500.00 of $10,000.00")).toBeVisible();
+  await expect(card.getByText(/your plan/)).toBeVisible();
+  await card.getByRole("button", { name: "Add money" }).click();
+  const money = page.getByRole("dialog");
+  await money.getByLabel("Amount").fill("100");
+  await money.getByRole("button", { name: "Save" }).click();
+  await expect(card.getByText("$2,600.00 of $10,000.00")).toBeVisible();
+});
+
+test("orders goals", async ({ page, isMobile }) => {
+  test.skip(isMobile, "stateful flow runs on desktop");
+  await page.goto("/sign-in?next=/goals");
+  await signIn(page, GOALS_ORDER_USER);
+  for (const name of ["First", "Second"]) {
+    await page.getByRole("button", { name: "Add goal" }).first().click();
+    const dialog = page.getByRole("dialog");
+    await dialog.getByLabel("Name").fill(name);
+    await dialog.getByRole("button", { name: "Save" }).click();
+    await expect(dialog).toBeHidden();
+  }
+  await page.getByRole("button", { name: "Move Second up" }).click();
+  await expect(page.getByRole("list", { name: "Goals" }).getByRole("heading").first()).toHaveText("Second");
+});
