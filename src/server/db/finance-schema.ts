@@ -12,6 +12,7 @@ import {
   timestamp,
   uniqueIndex,
 } from "drizzle-orm/pg-core";
+import type { Frequency, ScheduledFrequency } from "@/server/recurring/schedule";
 import { user } from "./auth-schema";
 
 export type AccountType = "checking" | "savings" | "credit_card" | "cash" | "loan" | "investment" | "other";
@@ -138,12 +139,21 @@ export const transactions = pgTable(
     needsReview: boolean("needs_review").default(false).notNull(),
     /** Shared id for both sides of a transfer, or NOT_A_TRANSFER. */
     transferPairId: text("transfer_pair_id"),
+    /** The paycheck or other income this deposit fulfils. */
+    incomeSourceId: text("income_source_id").references((): AnyPgColumn => incomeSources.id, { onDelete: "set null" }),
+    /** The bill, subscription, or recurring transfer this row fulfils. */
+    recurringRuleId: text("recurring_rule_id").references((): AnyPgColumn => recurringRules.id, { onDelete: "set null" }),
+    /** The expected occurrence it fulfils (null for irregular income). */
+    expectedDate: date("expected_date", { mode: "string" }),
+    matchSource: text("match_source").$type<MatchSource>(),
     ...timestamps,
   },
   (t) => [
     uniqueIndex("transactions_account_dedupe_idx").on(t.accountId, t.dedupeHash),
     index("transactions_user_date_idx").on(t.userId, t.date),
     index("transactions_user_review_idx").on(t.userId, t.needsReview),
+    uniqueIndex("transactions_income_occurrence_idx").on(t.incomeSourceId, t.expectedDate),
+    uniqueIndex("transactions_recurring_occurrence_idx").on(t.recurringRuleId, t.expectedDate),
   ],
 );
 
@@ -210,4 +220,64 @@ export const aiUsage = pgTable(
     createdAt: timestamp("created_at").defaultNow().notNull(),
   },
   (t) => [index("ai_usage_user_time_idx").on(t.userId, t.createdAt)],
+);
+
+export const incomeSources = pgTable(
+  "income_sources",
+  {
+    id: id(),
+    userId: userId(),
+    name: text("name").notNull(),
+    type: text("type").$type<IncomeType>().notNull(),
+    frequency: text("frequency").$type<Frequency>().notNull(),
+    /** First expected date; null only for irregular income. */
+    anchorDate: date("anchor_date", { mode: "string" }),
+    secondDay: integer("second_day"),
+    amountMode: text("amount_mode").$type<AmountMode>().notNull(),
+    /** Per occurrence (per month for irregular income); null = taken from the first matched deposit. */
+    expectedCents: cents("expected_cents"),
+    minCents: cents("min_cents"),
+    maxCents: cents("max_cents"),
+    accountId: text("account_id").references(() => accounts.id, { onDelete: "set null" }),
+    categoryId: text("category_id").references(() => categories.id, { onDelete: "set null" }),
+    matchPattern: text("match_pattern").notNull(),
+    active: boolean("active").default(true).notNull(),
+    ...timestamps,
+  },
+  (t) => [index("income_sources_user_idx").on(t.userId)],
+);
+
+export const recurringRules = pgTable(
+  "recurring_rules",
+  {
+    id: id(),
+    userId: userId(),
+    name: text("name").notNull(),
+    kind: text("kind").$type<RecurringKind>().notNull(),
+    frequency: text("frequency").$type<ScheduledFrequency>().notNull(),
+    anchorDate: date("anchor_date", { mode: "string" }).notNull(),
+    secondDay: integer("second_day"),
+    expectedCents: cents("expected_cents").notNull(),
+    amountVaries: boolean("amount_varies").default(false).notNull(),
+    /** Null = defaultToleranceCents(expected). */
+    toleranceCents: integer("tolerance_cents"),
+    accountId: text("account_id").references(() => accounts.id, { onDelete: "set null" }),
+    categoryId: text("category_id").references(() => categories.id, { onDelete: "set null" }),
+    matchPattern: text("match_pattern").notNull(),
+    active: boolean("active").default(true).notNull(),
+    ...timestamps,
+  },
+  (t) => [index("recurring_rules_user_idx").on(t.userId)],
+);
+
+/** Repeating merchants the user said not to suggest again. */
+export const recurringDismissals = pgTable(
+  "recurring_dismissals",
+  {
+    id: id(),
+    userId: userId(),
+    merchantKey: text("merchant_key").notNull(),
+    createdAt: timestamp("created_at").defaultNow().notNull(),
+  },
+  (t) => [uniqueIndex("recurring_dismissals_user_key_idx").on(t.userId, t.merchantKey)],
 );

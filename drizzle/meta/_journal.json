@@ -29,6 +29,13 @@
       "when": 1794786869523,
       "tag": "0003_backfill_user_categories",
       "breakpoints": true
+    },
+    {
+      "idx": 4,
+      "version": "7",
+      "when": 1794803006508,
+      "tag": "0004_jazzy_george_stacy",
+      "breakpoints": true
     }
   ]
 }

@@ -10,17 +10,23 @@ export type RuleLike = {
   createdAt: Date;
 };
 
+/**
+ * Whether `text` contains `pattern` as whole words, ignoring case: "uber"
+ * doesn't match "Huber's" and "shell" doesn't match "Shelley's".
+ */
+export function containsWords(text: string, pattern: string): boolean {
+  const escaped = pattern.trim().replace(/[.*+?^${}()|[\]\\]/g, "\\$&");
+  if (!escaped) return false;
+  return new RegExp(`(?<![a-z0-9])${escaped}(?![a-z0-9])`, "i").test(text);
+}
+
 function matches(rule: RuleLike, t: { merchant: string | null; description: string }): boolean {
   const pattern = rule.pattern.toLowerCase();
   switch (rule.matchType) {
     case "merchant_equals":
       return (t.merchant ?? "").toLowerCase() === pattern;
-    case "description_contains": {
-      // Whole words only, so "uber" doesn't match "Huber's" and "shell" doesn't match "Shelley's".
-      const escaped = pattern.replace(/[.*+?^${}()|[\]\\]/g, "\\$&");
-      const re = new RegExp(`(?<![a-z0-9])${escaped}(?![a-z0-9])`, "i");
-      return re.test(t.description) || re.test(t.merchant ?? "");
-    }
+    case "description_contains":
+      return containsWords(t.description, pattern) || containsWords(t.merchant ?? "", pattern);
     case "regex":
       try {
         return new RegExp(rule.pattern, "i").test(t.description);
