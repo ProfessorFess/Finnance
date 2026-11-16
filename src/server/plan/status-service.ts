@@ -184,8 +184,12 @@ export async function getPlanStatus(db: Database, userId: string, now: Date = ne
 
   // Activity: everything since the earliest window start.
   const defaultWindow = perIncome ? { start: last?.date ?? startDate, end: today } : month;
+  // Bills are paid monthly: a bills bucket without its own limit is measured over the month.
   const windows = new Map(
-    buckets.map((b) => [b.id, b.limitPeriod ? limitWindow(b.limitPeriod, today, settings.weekStartDay, last?.date ?? null, startDate) : defaultWindow]),
+    buckets.map((b) => [
+      b.id,
+      b.limitPeriod ? limitWindow(b.limitPeriod, today, settings.weekStartDay, last?.date ?? null, startDate) : b.role === "bills" ? month : defaultWindow,
+    ]),
   );
   const earliest = [...windows.values(), defaultWindow].reduce((min, w) => (w.start < min ? w.start : min), today);
   const rows: ActivityRow[] = (
@@ -210,8 +214,10 @@ export async function getPlanStatus(db: Database, userId: string, now: Date = ne
     const window = windows.get(b.id)!;
     const fundedCents = funded.get(b.id) ?? 0;
     const typicalFundedCents = typical ? (typical.funded.get(b.id) ?? 0) : null;
-    const saving = b.role === "savings" || b.role === "goal" || b.role === "bills";
-    const limitCents = b.limitCents ?? (saving ? (perIncome && !last ? (typicalFundedCents ?? 0) : fundedCents) : null);
+    const saving = b.role === "savings" || b.role === "goal";
+    const target = perIncome && !last ? (typicalFundedCents ?? 0) : fundedCents;
+    const monthlyTarget = Math.round((typicalFundedCents ?? fundedCents) * perMonth);
+    const limitCents = b.limitCents ?? (saving ? target : b.role === "bills" ? monthlyTarget : null);
     const activityCents = bucketActivity(eb, rows, window);
     return {
       id: b.id,

@@ -70,7 +70,8 @@ it("shows the latest income, its tasks, and each bucket", async () => {
   ]);
   expect(s.health).toEqual({ kind: "fully_allocated" });
   expect(byName(s.buckets, "Weekly spending")).toMatchObject({ limitCents: 20_000, window: { start: "2026-11-16", end: "2026-11-22" }, resetsOn: "2026-11-23", activityCents: 0, remainingCents: 20_000 });
-  expect(byName(s.buckets, "Bills")).toMatchObject({ window: { start: "2026-11-14", end: "2026-11-18" }, activityCents: 2_164, limitCents: 1_082, remainingCents: -1_082 });
+  // Bills are paid monthly, so a bills bucket without its own limit is measured over the month against its monthly total.
+  expect(byName(s.buckets, "Bills")).toMatchObject({ window: { start: "2026-11-01", end: "2026-11-30" }, activityCents: 2_164, limitCents: 2_164, remainingCents: 0 });
   expect(s.tasks.map((x) => [x.bucketName, x.destinationAccountName, x.amountCents, x.movedCents])).toEqual([
     ["Savings & investing", "Ally Savings", 40_000, 0],
     ["Weekly spending", "Ally Spending", 40_000, 0],

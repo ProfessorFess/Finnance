@@ -8,7 +8,7 @@ import { createOwner } from "../src/server/auth/create-owner";
 import { createAccount } from "../src/server/finance/accounts";
 import { setTrackingStartDate } from "../src/server/finance/settings";
 import { commitImport } from "../src/server/import/service";
-import { createIncomeSource } from "../src/server/recurring/items-service";
+import { createIncomeSource, createRecurringRule } from "../src/server/recurring/items-service";
 import * as schema from "../src/server/db/schema";
 import { assertSafeE2EDatabase } from "../src/test/e2e-db-guard";
 import { insertTestTransaction } from "../src/test/users";
@@ -21,6 +21,8 @@ import {
   OWNER,
   REVIEW_USER,
   REVIEW_USER_M,
+  PLAN_SCRATCH_USER,
+  PLAN_USER,
   RECURRING_LOG_USER,
   RECURRING_TRACK_USER,
   RECURRING_USER,
@@ -78,6 +80,24 @@ export default async function globalSetup() {
   await createIncomeSource(db, logUser.id, {
     name: "Tips", type: "side_income", frequency: "irregular", anchorDate: null, secondDay: null, amountMode: "varies",
     expectedCents: null, accountId: logUser.accounts[0]!.id, categoryId: null, matchPattern: "Tips",
+  });
+
+  // Budget plans: a paycheck with Ally accounts to move money to, and someone with only irregular income.
+  const planUser = await seeded(PLAN_USER, [CHECKING]);
+  await createAccount(db, planUser.id, { name: "Ally Savings", type: "savings", institution: "Ally", startingBalanceCents: 0 });
+  await createAccount(db, planUser.id, { name: "Ally Spending", type: "checking", institution: "Ally", startingBalanceCents: 0 });
+  await createIncomeSource(db, planUser.id, {
+    name: "Paycheck", type: "salary", frequency: "biweekly", anchorDate: "2026-11-14", secondDay: null, amountMode: "fixed",
+    expectedCents: 120000, accountId: planUser.accounts[0]!.id, categoryId: null, matchPattern: "Payroll Acme Corp",
+  });
+  await createRecurringRule(db, planUser.id, {
+    name: "Prime Video", kind: "subscription", frequency: "monthly", anchorDate: "2026-11-14", secondDay: null, expectedCents: 2164,
+    amountVaries: false, toleranceCents: null, accountId: planUser.accounts[0]!.id, categoryId: null, matchPattern: "Prime Video",
+  });
+  const scratchUser = await seeded(PLAN_SCRATCH_USER, [CHECKING]);
+  await createIncomeSource(db, scratchUser.id, {
+    name: "Side gigs", type: "side_income", frequency: "irregular", anchorDate: null, secondDay: null, amountMode: "varies",
+    expectedCents: 50000, accountId: scratchUser.accounts[0]!.id, categoryId: null, matchPattern: "Venmo",
   });
 
   // Rows as Phase 1a left them: never sorted (no source, no merchant, not flagged for review).
