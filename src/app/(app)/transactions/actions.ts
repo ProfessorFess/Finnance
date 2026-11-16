@@ -10,6 +10,7 @@ import { getDb } from "@/server/db/client";
 import { NotFoundError, ValidationError } from "@/server/finance/errors";
 import type { ItemRef } from "@/server/recurring/items-service";
 import { linkTransaction } from "@/server/recurring/matching-service";
+import { creditGoals } from "@/server/goals/credit-service";
 import {
   createManualTransaction,
   deleteTransaction,
@@ -54,7 +55,10 @@ export async function setCategory(id: string, categoryId: string | null): Promis
   const user = await requireUser();
   try {
     const res = await chooseCategory(getDb(), user.id, z.string().parse(id), z.string().nullable().parse(categoryId));
+    // A new category can make it count toward a goal that tracks that category.
+    await creditGoals(getDb(), user.id);
     revalidatePath("/transactions");
+    revalidatePath("/goals");
     return res;
   } catch (err) {
     return toFailure(err);
@@ -90,7 +94,9 @@ export async function bulkCategorize(ids: string[], categoryId: string | null): 
   const user = await requireUser();
   try {
     const changed = await setCategoryBulk(getDb(), user.id, z.array(z.string()).max(1000).parse(ids), z.string().nullable().parse(categoryId));
+    await creditGoals(getDb(), user.id);
     revalidatePath("/transactions");
+    revalidatePath("/goals");
     return { changed };
   } catch (err) {
     return toFailure(err);

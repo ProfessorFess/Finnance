@@ -7,6 +7,7 @@ import { logActivity } from "@/server/finance/activity";
 import { NotFoundError, ValidationError } from "@/server/finance/errors";
 import { getSettings } from "@/server/finance/settings";
 import { assertBucket } from "@/server/plan/plans-service";
+import { creditGoals, regoal } from "./credit-service";
 
 export type Goal = typeof goals.$inferSelect;
 export type GoalContribution = typeof goalContributions.$inferSelect;
@@ -77,11 +78,10 @@ async function getGoal(db: Executor, userId: string, id: string): Promise<Goal> 
   return g;
 }
 
-/** Runs after a goal's counting may have changed (re-credits it). */
-let afterGoalChange: (db: Database, userId: string, goalId: string) => Promise<unknown> = async () => undefined;
-export function setAfterGoalChange(fn: typeof afterGoalChange): void {
-  afterGoalChange = fn;
-}
+/** After a goal's counting rules change, its automatic credits are rebuilt. */
+const afterGoalChange = (db: Database, userId: string, goalId: string) => regoal(db, userId, goalId);
+/** After its status or order changes, history stays put; only uncounted money is credited. */
+const afterGoalMove = (db: Database, userId: string) => creditGoals(db, userId);
 
 export async function listGoals(db: Database, userId: string): Promise<Goal[]> {
   return db.select().from(goals).where(eq(goals.userId, userId)).orderBy(asc(goals.priority), asc(goals.createdAt));
@@ -138,7 +138,7 @@ export async function moveGoal(db: Database, userId: string, id: string, directi
     for (const [index, goalId] of order.entries()) await tx.update(goals).set({ priority: index + 1 }).where(and(eq(goals.id, goalId), eq(goals.userId, userId)));
     await logActivity(tx, { userId, actor: "user", action: "goal.move", entityType: "goal", entityId: id, before: { priority: a.priority }, after: { swappedWith: b.id, direction } });
   });
-  await afterGoalChange(db, userId, id);
+  await afterGoalMove(db, userId);
 }
 
 export async function setGoalStatus(db: Database, userId: string, id: string, status: GoalStatus): Promise<Goal> {
@@ -151,7 +151,7 @@ export async function setGoalStatus(db: Database, userId: string, id: string, st
       .where(and(eq(goals.id, id), eq(goals.userId, userId)));
     await logActivity(tx, { userId, actor: "user", action: "goal.status", entityType: "goal", entityId: id, before: { status: before.status }, after: { status } });
   });
-  await afterGoalChange(db, userId, id);
+  await afterGoalMove(db, userId);
   return getGoal(db, userId, id);
 }
 

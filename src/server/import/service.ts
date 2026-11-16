@@ -10,6 +10,7 @@ import { categorizeTransactions } from "@/server/categorize/pipeline";
 import { clearDanglingPairs, detectTransfers } from "@/server/categorize/transfers-service";
 import { restoreLoggedIncome, supersedeLoggedIncome } from "@/server/recurring/log-income";
 import { matchRecurring } from "@/server/recurring/matching-service";
+import { creditGoals } from "@/server/goals/credit-service";
 import { assignOccurrences, dedupeHash } from "./dedupe";
 import { headerSignature } from "./detect";
 import { ImportError } from "./errors";
@@ -299,6 +300,11 @@ export async function commitImport(
       matched = await matchRecurring(db, userId, { from: dates[0]!, to: dates[dates.length - 1]! });
     } catch (err) {
       console.error("Recurring matching failed", err instanceof Error ? err.message : err);
+    }
+    try {
+      await creditGoals(db, userId);
+    } catch (err) {
+      console.error("Crediting goals failed", err instanceof Error ? err.message : err);
     }
   }
   const needsReview = insertedIds.length
