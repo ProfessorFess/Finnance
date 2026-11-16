@@ -124,3 +124,13 @@ it("the create preview and the Plan page agree on a typical income", () => {
   expect(planTypicalIncome("monthly", household, "2026-11-20")).toBe(360_000);
   expect(planTypicalIncome("monthly", [{ frequency: "irregular" as const, planningCents: null, events: [] }], "2026-11-20")).toBeNull();
 });
+
+it("a buffer with a destination tracks moves; without one it tracks spending", () => {
+  const rows: ActivityRow[] = [
+    { date: "2026-11-13", amountCents: 20_000, accountId: "buffer-acct", categoryId: null, isTransfer: true, recurringRuleId: null },
+    { date: "2026-11-14", amountCents: -3_000, accountId: "chk", categoryId: "shopping", isTransfer: false, recurringRuleId: null },
+  ];
+  const w = { start: "2026-11-13", end: "2026-11-26" };
+  expect(bucketActivity(b({ role: "buffer", destinationAccountId: "buffer-acct", trackCategoryIds: ["shopping"] }), rows, w)).toBe(20_000);
+  expect(bucketActivity(b({ role: "buffer", trackCategoryIds: ["shopping"] }), rows, w)).toBe(3_000);
+});

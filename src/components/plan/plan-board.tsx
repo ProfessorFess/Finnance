@@ -41,7 +41,7 @@ export function PlanBoard({
         </Button>
       </div>
       <IncomeCard status={status} onLog={() => setLogging(true)} />
-      <HealthChip health={status.health} typicalCents={status.typicalIncomeCents} />
+      <HealthChip health={status.health} typicalCents={status.typicalIncomeCents} cadence={status.plan.cadence} />
       <ul className="grid gap-3 sm:grid-cols-2">
         {status.buckets.map((b) => (
           <BucketCard key={b.id} bucket={b} cadence={status.plan.cadence}>

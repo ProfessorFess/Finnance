@@ -153,7 +153,8 @@ const inWindow = (r: ActivityRow, w: { start: string; end: string }) => r.date >
 export function bucketActivity(bucket: EngineBucket, rows: ActivityRow[], window: { start: string; end: string }): number {
   const linked = new Set(bucket.linkedRuleIds);
   const tracked = new Set(bucket.trackCategoryIds);
-  const saving = bucket.role === "savings" || bucket.role === "goal";
+  // Savings and goals track money moved; so does a buffer that has somewhere to move to.
+  const saving = bucket.role === "savings" || bucket.role === "goal" || (bucket.role === "buffer" && bucket.destinationAccountId !== null);
   let total = 0;
   for (const r of rows) {
     if (!inWindow(r, window)) continue;

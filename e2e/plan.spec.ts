@@ -34,6 +34,7 @@ test("starts from scratch with a monthly plan", async ({ page, isMobile }) => {
   await expect(page.getByRole("heading", { name: "Groceries", exact: true })).toBeVisible();
   await expect(page.getByRole("heading", { name: "Whatever's left", exact: true })).toBeVisible();
   await expect(page.getByText("Fully allocated")).toBeVisible();
+  await expect(page.getByText(/for a typical ≈ \$500\.00 month/)).toBeVisible();
   await expect(page.getByRole("region", { name: "Income" }).getByText(/paycheck/i)).toHaveCount(0);
 });
 

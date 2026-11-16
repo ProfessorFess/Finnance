@@ -31,6 +31,8 @@ export function BucketCard({ bucket, cadence, children }: { bucket: BucketView; 
         <p className={cn("num text-2xl font-semibold", over && "text-destructive")}>
           {formatCents(bucket.activityCents)} <span className="text-base font-normal text-muted-foreground">of {formatCents(bucket.limitCents)} paid this month</span>
         </p>
+      ) : saving && !bucket.destinationAccountName && bucket.limitPeriod === null ? (
+        <p className="text-sm text-muted-foreground">Choose where it moves to in Edit plan.</p>
       ) : saving && bucket.limitCents !== null ? (
         <p className="num text-2xl font-semibold">
           {formatCents(bucket.activityCents)} <span className="text-base font-normal text-muted-foreground">of {formatCents(bucket.limitCents)} moved</span>
@@ -60,8 +62,8 @@ export function BucketCard({ bucket, cadence, children }: { bucket: BucketView; 
             {" · "}
           </span>
         )}
-        Gets {bucket.fundingType === "remainder" ? "what's left" : bucket.fundingType === "sum_of_recurring" ? "its bills" : formatCents(bucket.typicalFundedCents ?? bucket.fundedCents)}
-        {bucket.fundingType === "remainder" || bucket.fundingType === "sum_of_recurring" ? ` (≈ ${formatCents(bucket.typicalFundedCents ?? bucket.fundedCents)})` : ""}{" "}
+        Gets {bucket.fundingType === "remainder" ? "what's left" : bucket.fundingType === "sum_of_recurring" ? "its bills" : formatCents(bucket.typicalFundedCents ?? bucket.draft.fundingCents ?? bucket.fundedCents)}
+        {bucket.fundingType === "remainder" || bucket.fundingType === "sum_of_recurring" ? ` (≈ ${formatCents(bucket.typicalFundedCents ?? bucket.draft.fundingCents ?? bucket.fundedCents)})` : ""}{" "}
         {cadence === "monthly" ? "each month" : "from each income"}
         {bucket.destinationAccountName ? ` · moves to ${bucket.destinationAccountName}` : ""}
       </p>

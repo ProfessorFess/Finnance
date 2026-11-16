@@ -219,7 +219,7 @@ export async function getPlanStatus(db: Database, userId: string, now: Date = ne
 
   // Buckets moving to the same account share its transfers instead of each counting all of them.
   const savers = buckets.flatMap((b, i) =>
-    (b.role === "savings" || b.role === "goal") && b.destinationAccountId ? [{ b, eb: engineBuckets[i]! }] : [],
+    (b.role === "savings" || b.role === "goal" || b.role === "buffer") && b.destinationAccountId ? [{ b, eb: engineBuckets[i]! }] : [],
   );
   const inflows = new Map(savers.map(({ b }) => [b.id, destinationInflow(b.destinationAccountId!, rows, windows.get(b.id)!)]));
   const shared = shareDestinations(
