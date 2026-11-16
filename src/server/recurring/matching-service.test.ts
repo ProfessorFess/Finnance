@@ -194,3 +194,10 @@ it("doesn't treat a single deposit as irregular income's monthly amount", async 
   expect((await one("Payroll Acme Corp")).incomeSourceId).not.toBeNull();
   expect((await listIncomeSources(t.db, A))[0]!.expectedCents).toBeNull();
 });
+
+it("pausing an item keeps its past matches", async () => {
+  await importChecking();
+  const pay = await createIncomeSource(t.db, A, paycheck());
+  await updateIncomeSource(t.db, A, pay.id, { ...paycheck(), active: false });
+  expect(await one("Payroll Acme Corp")).toMatchObject({ incomeSourceId: pay.id, matchSource: "auto" });
+});

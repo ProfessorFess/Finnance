@@ -67,6 +67,15 @@ export function planningAmount(input: {
   const sorted = [...matches].sort((a, b) => a.date.localeCompare(b.date));
   if (input.irregular && expectedCents === null && mode !== "estimated") return monthlyAverage(sorted, today);
   if (mode === "fixed" || mode === "fixed_rule") return expectedCents === null ? fromLatest(sorted) : { cents: expectedCents, basis: "set" };
+  if (mode === "varies" && !input.irregular) {
+    // A paycheck that varies plans with its recent average once there are two or more;
+    // a typical amount the user gave is an estimate (shown with ≈).
+    const since = addDays(today, -ESTIMATE_LOOKBACK_DAYS);
+    const recent = sorted.filter((m) => m.date >= since && m.date <= today).map((m) => Math.abs(m.amountCents));
+    if (recent.length >= 2) return { cents: Math.round(recent.reduce((a, b) => a + b, 0) / recent.length), basis: "history" };
+    if (expectedCents !== null) return { cents: expectedCents, basis: "estimate" };
+    return fromLatest(sorted);
+  }
   if (mode === "varies" || mode === "varies_rule") return expectedCents === null ? fromLatest(sorted) : { cents: expectedCents, basis: "set" };
 
   const since = addDays(today, -ESTIMATE_LOOKBACK_DAYS);

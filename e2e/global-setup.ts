@@ -8,6 +8,7 @@ import { createOwner } from "../src/server/auth/create-owner";
 import { createAccount } from "../src/server/finance/accounts";
 import { setTrackingStartDate } from "../src/server/finance/settings";
 import { commitImport } from "../src/server/import/service";
+import { createIncomeSource } from "../src/server/recurring/items-service";
 import * as schema from "../src/server/db/schema";
 import { assertSafeE2EDatabase } from "../src/test/e2e-db-guard";
 import { insertTestTransaction } from "../src/test/users";
@@ -20,6 +21,7 @@ import {
   OWNER,
   REVIEW_USER,
   REVIEW_USER_M,
+  RECURRING_LOG_USER,
   RECURRING_TRACK_USER,
   RECURRING_USER,
   RULES_USER,
@@ -56,10 +58,13 @@ export default async function globalSetup() {
   const seeded = async (user: { name: string; email: string; password: string }, accounts: AccountSpec[]) => {
     const { id } = await createOwner(auth, user);
     await setTrackingStartDate(db, id, "2026-11-07");
+    const created = [];
     for (const a of accounts) {
       const acct = await createAccount(db, id, { name: a.name, type: a.type, institution: "UFCU", startingBalanceCents: 0 });
       await commitImport(db, id, { file: { name: a.file, bytes: new Uint8Array(readFileSync(`${FIXTURES}/${a.file}`)) }, accountId: acct.id }, { ai: null });
+      created.push(acct);
     }
+    return { id, accounts: created };
   };
   await seeded(TXN_USER, [CHECKING]);
   await seeded(TRANSFER_USER, [CHECKING, SAVINGS]);
@@ -69,6 +74,11 @@ export default async function globalSetup() {
   await seeded(RULES_USER, [CHECKING]);
   await seeded(RECURRING_USER, [CHECKING]);
   await seeded(RECURRING_TRACK_USER, [CHECKING]);
+  const logUser = await seeded(RECURRING_LOG_USER, [CHECKING]);
+  await createIncomeSource(db, logUser.id, {
+    name: "Tips", type: "side_income", frequency: "irregular", anchorDate: null, secondDay: null, amountMode: "varies",
+    expectedCents: null, accountId: logUser.accounts[0]!.id, categoryId: null, matchPattern: "Tips",
+  });
 
   // Rows as Phase 1a left them: never sorted (no source, no merchant, not flagged for review).
   const sortUser = await createOwner(auth, SORT_USER);

@@ -16,6 +16,7 @@ import {
   updateRecurringRule,
 } from "@/server/recurring/items-service";
 import { dismissSuggestion } from "@/server/recurring/suggestions-service";
+import { logIncome } from "@/server/recurring/log-income";
 
 type Failure = { error: string };
 
@@ -50,6 +51,7 @@ const itemForm = z.object({
   accountId: optional,
   categoryId: optional,
   matchPattern: z.string().max(400),
+  paused: z.string().optional(),
 });
 
 /** Adds or edits a paycheck, bill, subscription, or recurring transfer. */
@@ -78,6 +80,7 @@ export async function saveItem(formData: FormData): Promise<{ ref: ItemRef } | F
         accountId: f.accountId,
         categoryId: f.categoryId,
         matchPattern: f.matchPattern,
+        active: f.paused !== "on",
       };
       const row = f.id ? await updateIncomeSource(db, user.id, f.id, input) : await createIncomeSource(db, user.id, input);
       ref = { kind: "income", id: row.id };
@@ -96,6 +99,7 @@ export async function saveItem(formData: FormData): Promise<{ ref: ItemRef } | F
         accountId: f.accountId,
         categoryId: f.categoryId,
         matchPattern: f.matchPattern,
+        active: f.paused !== "on",
       };
       const row = f.id ? await updateRecurringRule(db, user.id, f.id, input) : await createRecurringRule(db, user.id, input);
       ref = { kind: "recurring", id: row.id };
@@ -127,6 +131,30 @@ export async function dismissSuggestionAction(merchantKey: string): Promise<{ ok
   try {
     await dismissSuggestion(getDb(), user.id, z.string().min(1).max(200).parse(merchantKey));
     revalidatePath("/recurring");
+    return { ok: true };
+  } catch (err) {
+    return toFailure(err);
+  }
+}
+
+const logForm = z.object({
+  incomeSourceId: z.string().min(1),
+  amount: z.string(),
+  date: z.string(),
+  accountId: z.string().min(1),
+  note: z.string().max(200).optional(),
+});
+
+/** "I got paid": records income that isn't in a bank file. */
+export async function logIncomeAction(formData: FormData): Promise<{ ok: true } | Failure> {
+  const user = await requireUser();
+  try {
+    const f = logForm.parse(Object.fromEntries(formData));
+    const cents = parseAmountToCents(f.amount);
+    if (cents === null || cents <= 0) throw new ValidationError("Enter an amount above $0");
+    await logIncome(getDb(), user.id, { incomeSourceId: f.incomeSourceId, accountId: f.accountId, date: f.date, amountCents: cents, note: f.note?.trim() || undefined });
+    revalidate();
+    revalidatePath("/plan");
     return { ok: true };
   } catch (err) {
     return toFailure(err);

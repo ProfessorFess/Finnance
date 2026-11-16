@@ -23,16 +23,16 @@ function StateChip({ item }: { item: ItemCardView }) {
   }
 }
 
-export function ItemCard({ item, onOpen }: { item: ItemCardView; onOpen: () => void }) {
+export function ItemCard({ item, onOpen, onLog }: { item: ItemCardView; onOpen: () => void; onLog?: () => void }) {
   const income = item.kind === "income";
   const Icon = income ? ArrowDownLeft : item.kind === "transfer" ? Repeat : CalendarClock;
   const approx = item.amountBasis === "estimate" || item.amountBasis === "history";
   return (
-    <li>
+    <li className="flex items-stretch border-b last:border-b-0">
       <button
         type="button"
         onClick={onOpen}
-        className="flex w-full items-start gap-3 border-b px-4 py-3.5 text-left transition-colors last:border-b-0 hover:bg-muted/40 focus-visible:bg-muted/40 focus-visible:outline-none sm:px-5"
+        className="flex min-w-0 flex-1 items-start gap-3 px-4 py-3.5 text-left transition-colors hover:bg-muted/40 focus-visible:bg-muted/40 focus-visible:outline-none sm:px-5"
       >
         <div className={cn("mt-0.5 grid size-9 shrink-0 place-items-center rounded-xl", income ? "bg-primary/10 text-primary" : "bg-muted text-muted-foreground")}>
           <Icon className="size-4" />
@@ -72,6 +72,16 @@ export function ItemCard({ item, onOpen }: { item: ItemCardView; onOpen: () => v
           )}
         </div>
       </button>
+      {onLog && (
+        <button
+          type="button"
+          onClick={onLog}
+          aria-label={`Log income for ${item.name}`}
+          className="shrink-0 border-l px-3 text-xs font-medium text-primary transition-colors hover:bg-muted/40 sm:px-4"
+        >
+          Log income
+        </button>
+      )}
     </li>
   );
 }

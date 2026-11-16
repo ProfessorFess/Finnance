@@ -35,6 +35,7 @@ export function resultLine(r: ImportResult): string {
   if (r.duplicates > 0) parts.push(`${r.duplicates} already here`);
   if (r.transfers > 0) parts.push(`${r.transfers} ${r.transfers === 1 ? "transfer" : "transfers"} matched`);
   if (r.matched > 0) parts.push(`${r.matched} matched to recurring`);
+  if (r.replacedLogged > 0) parts.push(`${r.replacedLogged} logged income replaced by the bank's record`);
   return parts.join(" · ");
 }
 

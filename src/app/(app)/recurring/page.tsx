@@ -26,6 +26,7 @@ function draftOf(v: RecurringItemView): ItemDraft {
     accountId: v.item.accountId,
     categoryId: v.item.categoryId,
     matchPattern: v.item.matchPattern,
+    active: v.item.active,
   };
   if (v.kind === "income") {
     const s = v.item as IncomeSource;
@@ -50,6 +51,7 @@ function cardOf(v: RecurringItemView): ItemCardView {
     lastMatch: v.lastMatch,
     recent: v.recentMatches.map((m) => ({ date: m.date, amountCents: m.amountCents })),
     accountName: v.accountName,
+    accountId: v.item.accountId,
     draft: draftOf(v),
   };
 }
@@ -106,6 +108,7 @@ export default async function RecurringPage() {
           suggestions={suggestions.map(suggestionOf)}
           monthlyIncomeCents={overview.monthlyIncomeCents}
           monthlyBillsCents={overview.monthlyBillsCents}
+          today={overview.today}
           accounts={accounts.map((a) => ({ id: a.id, name: a.name }))}
           categories={categories.map((c) => ({ id: c.id, name: c.name, groupName: c.groupName }))}
         />

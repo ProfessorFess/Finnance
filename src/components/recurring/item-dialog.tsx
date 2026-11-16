@@ -3,6 +3,16 @@
 import { useState, useTransition } from "react";
 import { toast } from "sonner";
 import { deleteItem, saveItem } from "@/app/(app)/recurring/actions";
+import {
+  AlertDialog,
+  AlertDialogAction,
+  AlertDialogCancel,
+  AlertDialogContent,
+  AlertDialogDescription,
+  AlertDialogFooter,
+  AlertDialogHeader,
+  AlertDialogTitle,
+} from "@/components/ui/alert-dialog";
 import { Button } from "@/components/ui/button";
 import { Dialog, DialogContent, DialogDescription, DialogFooter, DialogHeader, DialogTitle } from "@/components/ui/dialog";
 import { Input } from "@/components/ui/input";
@@ -27,6 +37,7 @@ export type ItemDraft = Partial<{
   accountId: string | null;
   categoryId: string | null;
   matchPattern: string;
+  active: boolean;
 }>;
 
 export type DialogOption = { id: string; name: string };
@@ -106,6 +117,7 @@ function ItemForm({
   const [categoryTouched, setCategoryTouched] = useState(Boolean(initial.categoryId));
   const [frequencyTouched, setFrequencyTouched] = useState(Boolean(initial.frequency));
   const [error, setError] = useState<string | null>(null);
+  const [confirmDelete, setConfirmDelete] = useState(false);
   const [pending, startTransition] = useTransition();
   const income = kind === "income";
 
@@ -306,6 +318,16 @@ function ItemForm({
         <p className="text-xs text-muted-foreground">Words in the bank description, like Payroll Acme.</p>
       </div>
 
+      {editing && (
+        <label className="flex items-start gap-2 text-sm">
+          <input type="checkbox" name="paused" defaultChecked={initial.active === false} className="mt-0.5 size-4 accent-primary" />
+          <span>
+            Paused
+            <span className="block text-xs text-muted-foreground">Stop expecting it. Past matches stay.</span>
+          </span>
+        </label>
+      )}
+
       {error && (
         <p role="alert" className="text-sm text-destructive">
           {error}
@@ -313,7 +335,7 @@ function ItemForm({
       )}
       <DialogFooter className="gap-2 sm:justify-between">
         {editing ? (
-          <Button type="button" variant="ghost" className="text-destructive" disabled={pending} onClick={remove}>
+          <Button type="button" variant="ghost" className="text-destructive" disabled={pending} onClick={() => setConfirmDelete(true)}>
             Delete
           </Button>
         ) : (
@@ -323,6 +345,20 @@ function ItemForm({
           Save
         </Button>
       </DialogFooter>
+      <AlertDialog open={confirmDelete} onOpenChange={setConfirmDelete}>
+        <AlertDialogContent>
+          <AlertDialogHeader>
+            <AlertDialogTitle>Delete {initial.name ?? "this item"}?</AlertDialogTitle>
+            <AlertDialogDescription>Its transactions stay, but they won&apos;t be linked to anything.</AlertDialogDescription>
+          </AlertDialogHeader>
+          <AlertDialogFooter>
+            <AlertDialogCancel>Cancel</AlertDialogCancel>
+            <AlertDialogAction disabled={pending} onClick={remove}>
+              Delete
+            </AlertDialogAction>
+          </AlertDialogFooter>
+        </AlertDialogContent>
+      </AlertDialog>
     </form>
   );
 }

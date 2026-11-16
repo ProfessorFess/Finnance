@@ -5,11 +5,24 @@ import { useState } from "react";
 import { Button } from "@/components/ui/button";
 import { type DialogCategory, type DialogOption, type ItemDraft, ItemDialog } from "./item-dialog";
 import { ItemCard } from "./item-card";
+import { LogIncomeDialog } from "./log-income-dialog";
 import { RecurringSummary } from "./recurring-summary";
 import { SuggestionList } from "./suggestion-list";
 import type { ItemCardView, SuggestionCardView } from "./types";
 
-function Section({ title, items, empty, onOpen }: { title: string; items: ItemCardView[]; empty: string; onOpen: (i: ItemCardView) => void }) {
+function Section({
+  title,
+  items,
+  empty,
+  onOpen,
+  onLog,
+}: {
+  title: string;
+  items: ItemCardView[];
+  empty: string;
+  onOpen: (i: ItemCardView) => void;
+  onLog?: (i: ItemCardView) => void;
+}) {
   return (
     <section className="mb-8">
       <h2 className="mb-3 text-lg font-semibold">{title}</h2>
@@ -18,7 +31,7 @@ function Section({ title, items, empty, onOpen }: { title: string; items: ItemCa
       ) : (
         <ul className="overflow-hidden rounded-2xl border bg-card shadow-xs">
           {items.map((i) => (
-            <ItemCard key={i.key} item={i} onOpen={() => onOpen(i)} />
+            <ItemCard key={i.key} item={i} onOpen={() => onOpen(i)} onLog={onLog ? () => onLog(i) : undefined} />
           ))}
         </ul>
       )}
@@ -34,6 +47,7 @@ export function RecurringBoard({
   monthlyBillsCents,
   accounts,
   categories,
+  today,
 }: {
   income: ItemCardView[];
   bills: ItemCardView[];
@@ -42,9 +56,11 @@ export function RecurringBoard({
   monthlyBillsCents: number;
   accounts: DialogOption[];
   categories: DialogCategory[];
+  today: string;
 }) {
   const [dialog, setDialog] = useState<{ open: boolean; draft: ItemDraft; recent: ItemCardView["recent"] }>({ open: false, draft: {}, recent: [] });
   const open = (draft: ItemDraft, recent: ItemCardView["recent"] = []) => setDialog({ open: true, draft, recent });
+  const [logging, setLogging] = useState<{ id: string; name: string; accountId: string | null } | null>(null);
 
   return (
     <>
@@ -60,6 +76,7 @@ export function RecurringBoard({
         items={income}
         empty="Add your paycheck — Finnance will expect it and match it when it arrives."
         onOpen={(i) => open(i.draft, i.recent)}
+        onLog={(i) => setLogging({ id: i.draft.id!, name: i.name, accountId: i.accountId })}
       />
       <Section
         title="Bills & subscriptions"
@@ -67,6 +84,7 @@ export function RecurringBoard({
         empty="Add bills and subscriptions, or track one from Transactions."
         onOpen={(i) => open(i.draft, i.recent)}
       />
+      <LogIncomeDialog open={logging !== null} onOpenChange={(o) => !o && setLogging(null)} source={logging} accounts={accounts} today={today} />
       <ItemDialog
         open={dialog.open}
         onOpenChange={(o) => setDialog((d) => ({ ...d, open: o }))}

@@ -155,6 +155,9 @@ async function fillExpectedAmounts(db: Database, userId: string, income: IncomeS
 
 /** Re-matches one item from scratch (after it changed): drops its automatic links, keeps the user's. */
 export async function rematchItem(db: Database, userId: string, ref: ItemRef): Promise<number> {
+  // A paused item stops being expected, but what it already matched stays.
+  const item = await loadItem(db, userId, ref);
+  if (!item.active) return 0;
   const column = ref.kind === "income" ? transactions.incomeSourceId : transactions.recurringRuleId;
   await db
     .update(transactions)

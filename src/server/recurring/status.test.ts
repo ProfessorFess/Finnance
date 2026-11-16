@@ -53,8 +53,16 @@ it("plans with the user's estimate until 3 months of deposits exist", () => {
 it("uses the set amount, or the latest deposit when it varies and none is set", () => {
   expect(planningAmount({ mode: "fixed", expectedCents: 120_000, irregular: false, matches: [], today: "2026-11-14" })).toEqual({ cents: 120_000, basis: "set" });
   expect(planningAmount({ mode: "fixed_rule", expectedCents: 2_164, irregular: false, matches: [], today: "2026-11-14" })).toEqual({ cents: 2_164, basis: "set" });
-  expect(planningAmount({ mode: "varies", expectedCents: null, irregular: false, matches: [m("2026-10-31", 90_000), m("2026-11-14", 120_000)], today: "2026-11-14" })).toEqual({ cents: 120_000, basis: "history" });
+  expect(planningAmount({ mode: "varies", expectedCents: null, irregular: false, matches: [m("2026-11-14", 120_000)], today: "2026-11-14" })).toEqual({ cents: 120_000, basis: "history" });
   expect(planningAmount({ mode: "varies", expectedCents: null, irregular: false, matches: [], today: "2026-11-14" })).toEqual({ cents: null, basis: "unknown" });
+});
+
+it("plans a varying paycheck with its recent average, shown as approximate", () => {
+  expect(planningAmount({ mode: "varies", expectedCents: 120_000, irregular: false, matches: [], today: "2026-11-14" })).toEqual({ cents: 120_000, basis: "estimate" });
+  expect(
+    planningAmount({ mode: "varies", expectedCents: 120_000, irregular: false, matches: [m("2026-10-02", 98_000), m("2026-10-16", 120_000), m("2026-10-30", 60_000)], today: "2026-11-14" }),
+  ).toEqual({ cents: 92_667, basis: "history" });
+  expect(planningAmount({ mode: "varies", expectedCents: 60_000, irregular: true, matches: [m("2026-11-01", 45_000), m("2026-11-10", 45_000)], today: "2026-11-14" })).toEqual({ cents: 60_000, basis: "set" });
 });
 
 it("plans irregular income as a monthly average of its deposits when no amount is set", () => {

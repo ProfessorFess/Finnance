@@ -18,6 +18,8 @@ export type ItemCardView = {
   lastMatch: { date: string; amountCents: number } | null;
   recent: { date: string; amountCents: number }[];
   accountName: string | null;
+  /** Default account for logging income. */
+  accountId: string | null;
   draft: ItemDraft;
 };
 
