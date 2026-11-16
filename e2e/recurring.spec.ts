@@ -1,0 +1,23 @@
+import { expect, test } from "@playwright/test";
+import { RECURRING_USER, signIn } from "./fixtures";
+
+test("adds a bill and sees it matched", async ({ page, isMobile }) => {
+  test.skip(isMobile, "stateful flow runs on desktop");
+  await page.goto("/sign-in?next=/recurring");
+  await signIn(page, RECURRING_USER);
+  await expect(page.getByRole("heading", { level: 1, name: "Recurring" })).toBeVisible();
+  await page.getByRole("button", { name: "Add", exact: true }).click();
+  const dialog = page.getByRole("dialog");
+  await dialog.getByLabel("Type", { exact: true }).selectOption({ label: "Subscription" });
+  await dialog.getByLabel("Name").fill("Prime Video");
+  await dialog.getByLabel("How often").selectOption({ label: "Monthly" });
+  await dialog.getByLabel("First date").fill("2026-11-14");
+  await dialog.getByLabel("Amount", { exact: true }).fill("21.64");
+  await dialog.getByLabel("Match text").fill("Prime Video");
+  await dialog.getByRole("button", { name: "Save" }).click();
+  await expect(dialog).toBeHidden();
+  const card = page.getByRole("listitem").filter({ hasText: "Prime Video" });
+  await expect(card.getByText("Last Nov 14, 2026")).toBeVisible();
+  await expect(card.getByText("$21.64").first()).toBeVisible();
+  await expect(card.getByText(/Late/)).toHaveCount(0);
+});

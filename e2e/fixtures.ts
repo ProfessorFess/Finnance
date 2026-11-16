@@ -13,6 +13,8 @@ export const REVIEW_USER = { name: "E2E Review", email: "review@e2e.test", passw
 export const REVIEW_USER_M = { name: "E2E Review Mobile", email: "review-m@e2e.test", password: "e2e-review-m-password-1" };
 export const SORT_USER = { name: "E2E Sort", email: "sort@e2e.test", password: "e2e-sort-password-1234" };
 export const RULES_USER = { name: "E2E Rules", email: "rules@e2e.test", password: "e2e-rules-password-123" };
+export const RECURRING_USER = { name: "E2E Recurring", email: "recurring@e2e.test", password: "e2e-recurring-password-1" };
+export const RECURRING_TRACK_USER = { name: "E2E Recurring Track", email: "recurring-track@e2e.test", password: "e2e-recurring-track-pw-1" };
 export const OWNER_STATE = "e2e/.auth/owner.json";
 
 const octet = () => Math.floor(Math.random() * 254) + 1;

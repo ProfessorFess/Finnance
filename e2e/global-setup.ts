@@ -20,6 +20,8 @@ import {
   OWNER,
   REVIEW_USER,
   REVIEW_USER_M,
+  RECURRING_TRACK_USER,
+  RECURRING_USER,
   RULES_USER,
   SORT_USER,
   TRANSFER_USER,
@@ -65,6 +67,8 @@ export default async function globalSetup() {
   await seeded(REVIEW_USER, [CHECKING]);
   await seeded(REVIEW_USER_M, [CHECKING]);
   await seeded(RULES_USER, [CHECKING]);
+  await seeded(RECURRING_USER, [CHECKING]);
+  await seeded(RECURRING_TRACK_USER, [CHECKING]);
 
   // Rows as Phase 1a left them: never sorted (no source, no merchant, not flagged for review).
   const sortUser = await createOwner(auth, SORT_USER);
