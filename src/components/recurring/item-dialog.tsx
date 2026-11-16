@@ -216,7 +216,7 @@ function ItemForm({
 
       <div className="grid grid-cols-2 gap-3">
         <div className="flex flex-col gap-1.5">
-          <Label htmlFor="item-amount">Amount</Label>
+          <Label htmlFor="item-amount">{frequency === "irregular" ? "Amount per month" : "Amount"}</Label>
           <Input
             id="item-amount"
             name="amount"

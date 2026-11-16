@@ -166,3 +166,31 @@ it("isolates users", async () => {
   expect(await matchRecurring(t.db, B)).toBe(0);
   expect((await get(payroll.id)).matchSource).toBe("dismissed");
 });
+
+it("a second manual link to a held occurrence links without fulfilling it, instead of crashing", async () => {
+  await importChecking();
+  const club = await createRecurringRule(t.db, A, bill({ name: "Coffee club", matchPattern: "Nothing", anchorDate: "2026-11-13", expectedCents: 625 }));
+  const [first, second] = await byDesc("Bennu Coffee");
+  await linkTransaction(t.db, A, first!.id, { kind: "recurring", id: club.id });
+  await linkTransaction(t.db, A, second!.id, { kind: "recurring", id: club.id });
+  expect(await get(first!.id)).toMatchObject({ recurringRuleId: club.id, matchSource: "user", expectedDate: "2026-11-13" });
+  expect(await get(second!.id)).toMatchObject({ recurringRuleId: club.id, matchSource: "user", expectedDate: null });
+});
+
+it("a manual link far from any occurrence fulfils nothing and leaves the automatic match alone", async () => {
+  await importChecking();
+  const prime = await createRecurringRule(t.db, A, bill());
+  const auto = await one("Prime Video");
+  expect(auto).toMatchObject({ recurringRuleId: prime.id, matchSource: "auto", expectedDate: "2026-11-14" });
+  const old = await insertTestTransaction(t.db, A, checking.id, { amountCents: -2164, date: "2026-10-14", description: "Prime Video" });
+  await linkTransaction(t.db, A, old.id, { kind: "recurring", id: prime.id });
+  expect(await get(old.id)).toMatchObject({ recurringRuleId: prime.id, matchSource: "user", expectedDate: null });
+  expect(await get(auto.id)).toMatchObject({ recurringRuleId: prime.id, matchSource: "auto", expectedDate: "2026-11-14" });
+});
+
+it("doesn't treat a single deposit as irregular income's monthly amount", async () => {
+  await importChecking();
+  await createIncomeSource(t.db, A, paycheck({ frequency: "irregular", anchorDate: null, expectedCents: null }));
+  expect((await one("Payroll Acme Corp")).incomeSourceId).not.toBeNull();
+  expect((await listIncomeSources(t.db, A))[0]!.expectedCents).toBeNull();
+});

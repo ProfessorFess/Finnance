@@ -1,4 +1,4 @@
-import { addDays } from "@/lib/dates";
+import { addDays, daysBetween } from "@/lib/dates";
 import type { AmountMode } from "@/server/db/schema";
 import { DUE_SOON_DAYS, ESTIMATE_LOOKBACK_DAYS, MATCH_WINDOW_DAYS, nextOccurrence, occurrencesBetween, type Schedule } from "./schedule";
 
@@ -65,6 +65,7 @@ export function planningAmount(input: {
 }): { cents: number | null; basis: AmountBasis } {
   const { mode, expectedCents, matches, today } = input;
   const sorted = [...matches].sort((a, b) => a.date.localeCompare(b.date));
+  if (input.irregular && expectedCents === null && mode !== "estimated") return monthlyAverage(sorted, today);
   if (mode === "fixed" || mode === "fixed_rule") return expectedCents === null ? fromLatest(sorted) : { cents: expectedCents, basis: "set" };
   if (mode === "varies" || mode === "varies_rule") return expectedCents === null ? fromLatest(sorted) : { cents: expectedCents, basis: "set" };
 
@@ -81,4 +82,14 @@ export function planningAmount(input: {
 function fromLatest(sorted: { amountCents: number }[]): { cents: number | null; basis: AmountBasis } {
   const last = sorted[sorted.length - 1];
   return last ? { cents: Math.abs(last.amountCents), basis: "history" } : { cents: null, basis: "unknown" };
+}
+
+/** Irregular income per month: deposits over the last 3 months, averaged over the months seen (at least one). */
+function monthlyAverage(sorted: { date: string; amountCents: number }[], today: string): { cents: number | null; basis: AmountBasis } {
+  const since = addDays(today, -ESTIMATE_LOOKBACK_DAYS);
+  const recent = sorted.filter((m) => m.date >= since && m.date <= today);
+  if (recent.length === 0) return { cents: null, basis: "unknown" };
+  const sum = recent.reduce((a, m) => a + Math.abs(m.amountCents), 0);
+  const months = Math.min(3, Math.max(1, (daysBetween(recent[0]!.date, today) + 1) / 30));
+  return { cents: Math.round(sum / months), basis: "history" };
 }

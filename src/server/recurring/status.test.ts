@@ -56,3 +56,9 @@ it("uses the set amount, or the latest deposit when it varies and none is set", 
   expect(planningAmount({ mode: "varies", expectedCents: null, irregular: false, matches: [m("2026-10-31", 90_000), m("2026-11-14", 120_000)], today: "2026-11-14" })).toEqual({ cents: 120_000, basis: "history" });
   expect(planningAmount({ mode: "varies", expectedCents: null, irregular: false, matches: [], today: "2026-11-14" })).toEqual({ cents: null, basis: "unknown" });
 });
+
+it("plans irregular income as a monthly average of its deposits when no amount is set", () => {
+  const four = [m("2026-10-20", 25_000), m("2026-10-27", 25_000), m("2026-11-03", 25_000), m("2026-11-10", 25_000)];
+  expect(planningAmount({ mode: "varies", expectedCents: null, irregular: true, matches: four, today: "2026-11-14" })).toEqual({ cents: 100_000, basis: "history" });
+  expect(planningAmount({ mode: "varies", expectedCents: 80_000, irregular: true, matches: four, today: "2026-11-14" })).toEqual({ cents: 80_000, basis: "set" });
+});

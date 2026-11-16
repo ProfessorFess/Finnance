@@ -3,11 +3,11 @@ import { addDays, daysBetween } from "@/lib/dates";
 import { activityLog, incomeSources, NOT_A_TRANSFER, recurringRules, transactions } from "@/server/db/schema";
 import type { Database } from "@/server/db/types";
 import { logActivity } from "@/server/finance/activity";
-import { NotFoundError } from "@/server/finance/errors";
+import { NotFoundError, ValidationError } from "@/server/finance/errors";
 import { getTrackingStartDate } from "@/server/finance/settings";
 import type { IncomeSource, ItemRef, RecurringRule } from "./items-service";
 import { findMatches, type MatchCandidate, type MatchItem } from "./match";
-import { defaultToleranceCents, MATCH_WINDOW_DAYS, occurrencesBetween, type Schedule } from "./schedule";
+import { defaultToleranceCents, LINK_REACH_DAYS, MATCH_WINDOW_DAYS, occurrencesBetween, type Schedule } from "./schedule";
 
 const scheduleOf = (i: IncomeSource | RecurringRule): Schedule => ({ frequency: i.frequency, anchorDate: i.anchorDate, secondDay: i.secondDay });
 
@@ -131,7 +131,8 @@ export async function matchRecurring(db: Database, userId: string, range?: { fro
 
 /** "Not sure of the amount": take it from the first matched deposit (spec 13, step 3). */
 async function fillExpectedAmounts(db: Database, userId: string, income: IncomeSource[]): Promise<void> {
-  for (const s of income.filter((i) => i.expectedCents === null)) {
+  // Irregular income's amount is per month, so one deposit can't stand in for it.
+  for (const s of income.filter((i) => i.expectedCents === null && i.frequency !== "irregular")) {
     const [first] = await db
       .select({ amountCents: transactions.amountCents })
       .from(transactions)
@@ -186,10 +187,44 @@ export async function linkTransaction(db: Database, userId: string, transactionI
   let expectedDate: string | null = null;
   if (ref) {
     const item = await loadItem(db, userId, ref);
-    const nearby = occurrencesBetween(scheduleOf(item), addDays(row.date, -400), addDays(row.date, 400));
-    expectedDate = nearby.reduce<string | null>((best, d) => (best === null || Math.abs(daysBetween(d, row.date)) < Math.abs(daysBetween(best, row.date)) ? d : best), null);
+    if (item.frequency !== "irregular") {
+      // The nearest occurrence within about half a period that another hand-linked
+      // row doesn't already hold; otherwise the row is linked but fulfils no date.
+      const column = ref.kind === "income" ? transactions.incomeSourceId : transactions.recurringRuleId;
+      const held = new Set(
+        (
+          await db
+            .select({ expectedDate: transactions.expectedDate })
+            .from(transactions)
+            .where(and(eq(transactions.userId, userId), eq(column, ref.id), eq(transactions.matchSource, "user"), ne(transactions.id, row.id), isNotNull(transactions.expectedDate)))
+        ).map((r) => r.expectedDate!),
+      );
+      const reach = Math.max(MATCH_WINDOW_DAYS, LINK_REACH_DAYS[item.frequency]);
+      expectedDate =
+        occurrencesBetween(scheduleOf(item), addDays(row.date, -reach), addDays(row.date, reach))
+          .filter((d) => !held.has(d))
+          .sort((a, b) => Math.abs(daysBetween(a, row.date)) - Math.abs(daysBetween(b, row.date)) || a.localeCompare(b))[0] ?? null;
+    }
   }
 
+  try {
+    await writeLink(db, userId, row.id, ref, expectedDate, before);
+  } catch (err) {
+    const code = (err as { cause?: { code?: string }; code?: string }).cause?.code ?? (err as { code?: string }).code;
+    if (code === "23505") throw new ValidationError("That date is already matched to another transaction. Try again.");
+    throw err;
+  }
+}
+
+async function writeLink(
+  db: Database,
+  userId: string,
+  rowId: string,
+  ref: ItemRef | null,
+  expectedDate: string | null,
+  before: Record<string, unknown>,
+): Promise<void> {
+  const row = { id: rowId };
   await db.transaction(async (tx) => {
     if (ref && expectedDate) {
       // The user's choice wins: an automatic link holding this occurrence lets go.

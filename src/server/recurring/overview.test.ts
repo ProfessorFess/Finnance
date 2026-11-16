@@ -2,6 +2,7 @@ import { afterEach, beforeEach, expect, it } from "vitest";
 import { type Account, createAccount } from "@/server/finance/accounts";
 import { setTrackingStartDate } from "@/server/finance/settings";
 import { commitImport } from "@/server/import/service";
+import { createManualTransaction } from "@/server/finance/transactions";
 import { createTestDb } from "@/test/db";
 import { fixtureBytes } from "@/test/fixtures";
 import { createTestUser, insertTestTransaction } from "@/test/users";
@@ -99,4 +100,12 @@ it("returns nothing before a start date is set, and isolates users", async () =>
   expect(await getRecurringOverview(t.db, B, now)).toMatchObject({ hasStartDate: false, income: [], bills: [] });
   await setTrackingStartDate(t.db, B, "2026-11-07");
   expect((await getRecurringOverview(t.db, B, now)).income).toEqual([]);
+});
+
+it("a hand-added entry doesn't make a missing paycheck look late", async () => {
+  await commitImport(t.db, A, { file: { name: "ufcu.csv", bytes: fixtureBytes("ufcu-checking.csv") }, accountId: checking.id });
+  await createIncomeSource(t.db, A, paycheck({ anchorDate: "2026-11-21", matchPattern: "Nothing Here" }));
+  await createManualTransaction(t.db, A, { accountId: checking.id, date: "2026-11-30", description: "Cash coffee", amountCents: -500 });
+  const o = await getRecurringOverview(t.db, A, new Date("2026-12-01T18:00:00Z"));
+  expect(o.income[0]).toMatchObject({ state: "awaiting", lateDates: [], awaitingDates: ["2026-11-21"] });
 });

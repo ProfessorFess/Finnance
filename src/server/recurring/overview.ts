@@ -1,6 +1,6 @@
-import { and, desc, eq, isNotNull, ne, or, sql } from "drizzle-orm";
+import { and, desc, eq, inArray, isNotNull, ne, or, sql } from "drizzle-orm";
 import { todayInTimeZone } from "@/lib/dates";
-import { accounts, categories, type RecurringKind, transactions } from "@/server/db/schema";
+import { accounts, categories, type RecurringKind, type TransactionSource, transactions } from "@/server/db/schema";
 import type { Database } from "@/server/db/types";
 import { getSettings } from "@/server/finance/settings";
 import { type IncomeSource, type ItemRef, listIncomeSources, listRecurringRules, type RecurringRule } from "./items-service";
@@ -35,6 +35,8 @@ export type RecurringOverview = {
   hasStartDate: boolean;
 };
 
+const IMPORTED_SOURCES: TransactionSource[] = ["csv", "xlsx", "ofx", "sync"];
+
 type Match = { transactionId: string; date: string; amountCents: number; incomeSourceId: string | null; recurringRuleId: string | null; expectedDate: string | null };
 
 /** Everything the Recurring page shows: each item's status, amounts, and matches, plus monthly totals. */
@@ -62,7 +64,9 @@ export async function getRecurringOverview(db: Database, userId: string, now: Da
     db
       .select({ accountId: transactions.accountId, last: sql<string>`max(${transactions.date})::text` })
       .from(transactions)
-      .where(and(eq(transactions.userId, userId), ne(transactions.status, "excluded")))
+      // Only imported rows say how far the bank data reaches; a hand-added entry
+      // dated today must not make everything before it look late.
+      .where(and(eq(transactions.userId, userId), ne(transactions.status, "excluded"), inArray(transactions.source, IMPORTED_SOURCES)))
       .groupBy(transactions.accountId),
     db.select({ id: accounts.id, name: accounts.name }).from(accounts).where(eq(accounts.userId, userId)),
     db.select({ id: categories.id, name: categories.name }).from(categories).where(eq(categories.userId, userId)),

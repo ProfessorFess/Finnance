@@ -22,6 +22,9 @@ export function defaultToleranceCents(expectedCents: number): number {
   return Math.max(200, Math.round(expectedCents * 0.2));
 }
 
+/** How far a hand-linked transaction may be from an occurrence and still fulfil it: about half a period. */
+export const LINK_REACH_DAYS: Record<ScheduledFrequency, number> = { weekly: 3, biweekly: 7, semimonthly: 7, monthly: 15, quarterly: 45, yearly: 182 };
+
 export const PERIODS_PER_YEAR: Record<ScheduledFrequency, number> = { weekly: 52, biweekly: 26, semimonthly: 24, monthly: 12, quarterly: 4, yearly: 1 };
 
 export function monthlyEquivalentCents(cents: number, frequency: ScheduledFrequency): number {
