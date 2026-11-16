@@ -2,7 +2,7 @@
 
 A private, modular personal finance dashboard with an AI assistant. See the [design](docs/superpowers/specs/2026-11-15-finnance-design.md) for the full vision and roadmap.
 
-**Status:** Phase 2a-2 (goals): goals that credit themselves from real transfers and spending, in priority order, with projections from your recent pace or your plan. Built on Phase 2a-1 (budget plans: log income, buckets that split each income or budget each month, move tasks, health check), Phase 1c (income and recurring), 1b (automatic sorting), 1a (accounts, import, transactions), and Phase 0 (private sign-in with two-factor, installable on phones).
+**Status:** Phase 2a (budget plans, goals, and Home): a Home built from your plan (weekly spending left, paycheck moves, goals, upcoming bills, spending by category, what needs attention) and a short, skippable first-run setup. It also has goals that credit themselves from real transfers, and budget plans (log income, buckets that split each income or budget each month, move tasks, health check). Built on Phase 1c (income and recurring), 1b (automatic sorting), 1a (accounts, import, transactions), and Phase 0 (private sign-in with two-factor, installable on phones).
 
 Conventions every change follows: [docs/conventions.md](docs/conventions.md).
 

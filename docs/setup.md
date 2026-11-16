@@ -160,3 +160,21 @@ Goals track themselves from the money you actually move.
 5. Any transaction can count toward a goal: open it in **Transactions** and choose **Counts toward**.
 
 ✅ Each goal shows its progress and when you'll get there, "your plan" until 3 months of real contributions exist, then "your recent pace".
+
+## 15. Your Home
+
+Home is built from your plan, and keeps itself up to date from your imports.
+
+1. Open **Home**. In order, it shows:
+   - what's left in **Weekly spending** this week;
+   - your latest paycheck's moves;
+   - your plan;
+   - your goals;
+   - what's coming up in the next two weeks;
+   - where your money went this month;
+   - anything that needs a look;
+   - your recent transactions.
+2. If **Finish setting up** appears, it links to the next step. Each step can be skipped, and **Setup** stays in the menu until every step is done or skipped.
+3. After each import, Home updates by itself, with no typing.
+
+✅ Home shows **Weekly spending** left this week, your paycheck's moves, your plan, and your goals, all from your imports. That's Phase 2a's goal: Finnance replaces the spreadsheet.
