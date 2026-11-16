@@ -2,7 +2,7 @@
 
 A private, modular personal finance dashboard with an AI assistant. See the [design](docs/superpowers/specs/2026-11-15-finnance-design.md) for the full vision and roadmap.
 
-**Status:** Phase 1c (income and recurring): paychecks, bills, and subscriptions entered once and matched to imports automatically; late vs. waiting-for-import status; suggestions for repeating charges. Built on Phase 1b (automatic sorting: rules, past choices, Claude Haiku, transfer matching, review queue), Phase 1a (accounts, multi-file import, transactions), and Phase 0 (private sign-in with two-factor, installable on phones).
+**Status:** Phase 2a-1 (budget plans): log income by hand; budgets that split each income as it arrives or budget each month, built from editable buckets (Paycheck plan or Start from scratch), with limits, move tasks that tick off themselves, and a health check. Built on Phase 1c (income and recurring), 1b (automatic sorting), 1a (accounts, import, transactions), and Phase 0 (private sign-in with two-factor, installable on phones).
 
 Conventions every change follows: [docs/conventions.md](docs/conventions.md).
 

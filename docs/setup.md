@@ -136,3 +136,15 @@ Enter each paycheck, bill, and subscription once. Finnance then expects it, link
 ✅ Your latest paycheck shows under **Recurring → Income** with its date, and the next payday is two weeks later.
 
 If a match is wrong, open the transaction and tap **Not this one**. If a payment was missed because it came unusually late, link it by hand with **Part of…**. Finnance never changes either choice afterward.
+
+## 13. Make your plan
+
+A plan splits the money you receive into buckets and shows what's left in each, from your imports alone.
+
+1. Make sure your paycheck is in **Recurring** (step 12). Income that isn't in a bank file can be added with **Log income**.
+2. Open **Plan** and choose **Paycheck plan** (or **Start from scratch**: split each income as it arrives, or budget each month).
+3. Set what each bucket gets from each paycheck, and any limits (like $200 per week; typing a limit suggests what the bucket should get). Pick where money moves to. Add, rename, or remove buckets freely; everything can change later in **Edit plan**.
+4. Bills come from **Recurring**: each is paid from its **Paid from** bucket (your **Bills** bucket by default), shared across the paychecks in a month. Whatever's left goes to **Goal fund / buffer**.
+5. When a paycheck arrives, **Plan** shows it with your moves ("Move $400 to Ally Savings"). Each one ticks off by itself once the transfer shows up.
+
+✅ **Weekly spending** shows what's left this week, and the check reads **Fully allocated**.
