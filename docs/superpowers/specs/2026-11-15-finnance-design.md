@@ -15,6 +15,13 @@ A beautiful dashboard over stale data is a failure. A plain dashboard that stays
 
 **Modular by design (owner's vision).** People's finances differ. Someone may have several incomes, irregular income, a different way of budgeting, or no interest in some features at all. Finnance must not force one fixed layout or method on everyone. It is built from shared building blocks (income sources, accounts, transactions, budget buckets, goals, dashboard widgets) that each user combines and configures to fit their own situation. The owner's own setup (section 13) is the first configuration, not a hard-coded design.
 
+**Guiding principle: minimal building blocks, records first, shaped by AI (owner's direction, 2026-11-16).** This is the key idea behind every system in Finnance:
+- **Track what actually happens.** The core of each system is a record of real events: money that arrived, money that went out, money moved to savings. Income is whatever lands in an account, whether imported, synced, or typed in ("I got paid $340 today"). Nothing requires a schedule or a fixed shape to work.
+- **Expectations are optional overlays.** Schedules, typical amounts, and rules ("every 2 weeks, about $1,200"; "the third paycheck of a month goes to savings") add forecasts, reminders, and late flags on top of the records. Without them, everything still works.
+- **Small, combinable building blocks.** Income sources, buckets, funding rules, limits, bills, goals, and widgets combine freely, in any number. Budgeting methods are templates: data that sets up blocks, never code paths.
+- **The assistant shapes the app.** A user explains their situation, and the assistant configures the blocks to fit it. Every block is created and changed through one validated domain service, so anything the UI can do, the assistant can do (section 11).
+- **The owner is the first configuration, not the design.** Each plan for a phase must work for households unlike the owner's, and proves it with a test fixture for one.
+
 **Clean-slate start (owner's decision).** The owner is not bringing over past data. Tracking starts fresh **on the date of their next paycheck** and runs forward from there, with a new plan made in the app. Finnance treats this as normal for every user, not as an edge case:
 - every user has a **tracking start date**;
 - each account has a **starting balance** on that date;
@@ -157,9 +164,10 @@ All tables carry `id`, `userId`, `createdAt`, and `updatedAt` unless noted.
 ### Income and recurring
 - **IncomeSource** (any number per user):
   - name and type (`salary | hourly | freelance | benefits | side_income | other`);
-  - schedule: weekly, biweekly, semimonthly, monthly, or **irregular**;
+  - schedule (optional): weekly, biweekly, semimonthly, monthly, or **irregular** (no schedule). A schedule only adds expectations; the source's **income events** (its linked deposits) are what the rest of the app uses;
   - amount mode: `fixed`, `varies` (with a typical range), or `estimated` (trailing 3-month average of matched deposits);
-  - expected amount, deposit account, merchant/description match pattern, anchor date, and active flag.
+  - expected amount, deposit account, merchant/description match pattern, anchor date, and active flag (paused stops expectations, not records).
+  - **Log income:** a user (or the assistant) can record an income event by hand, for income that isn't in an imported file.
 - **RecurringRule** (bills and subscriptions):
   - name, kind (`bill | subscription | transfer`), expected amount (with a tolerance, or a "varies" flag), and schedule (weekly to yearly);
   - account, category, match pattern, and active flag;
@@ -167,21 +175,21 @@ All tables carry `id`, `userId`, `createdAt`, and `updatedAt` unless noted.
 
 ### Budgeting: the bucket engine
 - **BudgetPlan:** name, `template` (`paycheck_plan | monthly_categories | fifty_thirty_twenty | custom`; a label for the UI), `cadence`, and active flag.
-  - `cadence` is `per_paycheck` (tied to one or more IncomeSources) or `monthly`.
+  - `cadence` is `per_income` ("split each income as it arrives") or `monthly` ("budget each month"). Either is tied to one or more IncomeSources, scheduled or not.
   - One active plan per user at a time. Others can be kept as drafts.
 - **Bucket:**
   - plan, name, icon, color, sort order, and `role` (`spending | bills | savings | goal | buffer`);
-  - **funding rule:**
-    - `fixed` amount per plan period;
-    - `percent` of income;
-    - `sum_of_recurring`: the total of linked RecurringRules, prorated to the plan period. This auto-updates, like the spreadsheet's Subscriptions total feeding the budget.
+  - **funding rule** (applied to each income event in a `per_income` plan, or to the month's income in a `monthly` plan):
+    - `fixed` amount;
+    - `percent` of the income;
+    - `sum_of_recurring`: the total of the RecurringRules paid from this bucket, as a share of each income (monthly total ÷ incomes expected per month) or the monthly total. This auto-updates, like the spreadsheet's Subscriptions total feeding the budget.
     - `remainder`: whatever is left after all other buckets.
-  - **spending period:** how often its limit resets (`weekly | per_paycheck | monthly`), which can differ from funding. For example, funded $400 per paycheck and spent as $200 a week.
+  - **limit** (optional): what can be spent or moved per window (`weekly | monthly | per_income`), separate from funding. For example, funded $400 from each paycheck and spent as $200 a week. Without a limit, a bucket simply tracks.
   - **tracking:** which spending counts against it (a set of categories, optionally limited to accounts). Buckets with the savings, goal, or buffer role track transfers or contributions instead of spending.
   - **destination:** optional account and/or goal the money is meant to go to;
   - **rollover:** `none`, `carry` (leftover adds to next period), or `sweep` (leftover moves to another bucket).
-- **PlanRule:** special-case income rules. For example: "In months with a 3rd paycheck, send 100% of it to bucket X", or "Irregular or bonus income: split 50% Savings / 50% Buffer."
-- **AllocationTask** (derived, not stored): when a paycheck arrives, each bucket with a destination account generates a to-do, such as "Move $400 to Ally Savings". It is ticked off automatically when a matching transfer appears.
+- **PlanRule:** special-case income rules, counted from actual income events. For example: "The 3rd paycheck from my job in a month sends 100% to bucket X", or "Irregular or bonus income: split 50% Savings / 50% Buffer."
+- **AllocationTask** (derived, not stored): when an income event arrives, each bucket with a destination account generates a to-do, such as "Move $400 to Ally Savings". It is ticked off automatically when a matching transfer appears.
 
 ### Goals
 - **Goal:**
@@ -247,6 +255,7 @@ For each new transaction, in order:
 *(Builder's call, so totals are never quietly undercounted or inflated.)*
 
 ### 7.4 Income and recurring: "enter once"
+- **Records first.** Income is the deposits that actually arrive (imported, synced, or logged by hand or through the assistant). Schedules are an optional layer that adds expectations.
 - **Income sources** and **recurring bills** generate **expected occurrences** from their schedules on the fly. They are not stored as transactions.
 - An imported or synced transaction that matches (pattern, amount within tolerance, date within ±3 days) is linked to the occurrence. **The expected item is then fulfilled, never double-counted.**
 - **Irregular income** has no expected dates. Its typical monthly amount (trailing average) is used for planning, and each deposit is matched by pattern.
@@ -269,30 +278,31 @@ With a clean-slate start, features that normally learn from history start cold. 
 ## 8. Modularity
 
 ### 8.1 Budget plans (bucket engine)
-**How a period is computed**
-- Each bucket's **funded** amount comes from its funding rule.
-- **Spent or moved** is the sum of tracked transactions, transfers, or contributions in the current spending period.
-- **Remaining** is funded minus spent.
-- Rollover applies at period end.
+**How a plan runs** (event-driven)
+- **Funding happens when money arrives.** In a `per_income` plan, each income event from the plan's sources is split by the funding rules, using its actual amount. In a `monthly` plan, the month's income (expected, and received so far) is split.
+- **Limits are windows of time:** a calendar week (from the user's week-start day), a calendar month, or the time since the latest income.
+- **Spent or moved** is the sum of tracked transactions, transfers, or contributions in the bucket's window. **Remaining** is the limit minus that.
+- Rollover applies at the end of a window (Phase 2b).
 
-**Plan health check:** total allocations versus expected income, shown as "Fully allocated", "$X unassigned", or "Over by $X". This is the spreadsheet's "Check" cell.
+**Plan health check:** total allocations versus a typical income (recent income events, or the sources' expected amounts before any arrive), shown as "Fully allocated", "$X unassigned", or "Over by $X". This is the spreadsheet's "Check" cell.
 
 **Templates shipped in Phase 2a/2b** (each creates a plan with sensible buckets the user can edit):
-- **Paycheck plan:** a per-paycheck split into fixed or percent buckets, plus a remainder bucket and an extra-paycheck rule. This is the owner's method.
+- **Paycheck plan:** split each paycheck into fixed or percent buckets, plus a remainder bucket and an extra-paycheck rule. This is the owner's method.
+- **Start from scratch:** one "whatever's left" bucket, per income or per month; the user (or the assistant) adds the rest.
 - **Monthly category budget:** one fixed bucket per chosen category, reset monthly.
 - **50/30/20:** three percent-of-income buckets mapped to category groups (Needs, Wants, Savings).
 
 Later templates, such as zero-based envelopes and debt snowball, are data, not code.
 
-**Weekly allowance** is simply a spending bucket with a weekly spending period. The weekly tracker in the owner's spreadsheet becomes automatic: discretionary transactions count against it, and nothing is entered by hand.
+**Weekly allowance** is simply a spending bucket with a weekly limit. The weekly tracker in the owner's spreadsheet becomes automatic: discretionary transactions count against it, and nothing is entered by hand.
 
-**Multiple incomes:** a per-paycheck plan can be tied to several income sources, and each paycheck funds buckets by the plan's rules. A monthly plan uses total expected monthly income.
+**Multiple and irregular incomes:** a plan can be tied to any number of income sources, scheduled or not. In a `per_income` plan every deposit from any of them is split by the plan's rules (a gig worker's payouts work the same way as a biweekly paycheck). A monthly plan pools the month's income.
 
-**Paycheck flow** (owner's main loop):
-1. A paycheck is detected.
+**Paycheck flow** (owner's main loop; the same for any income event):
+1. A paycheck arrives (imported, synced, or logged).
 2. The plan shows a "Paycheck arrived: $1,200" card with its allocation tasks (move $400 to savings, and so on).
 3. Tasks tick off automatically as matching transfers appear.
-4. Bucket balances reset or fund for the new period.
+4. Each bucket's window keeps counting; weekly and monthly limits reset on their own calendar.
 
 ### 8.2 Modular dashboard
 - **Widget registry.** Each widget type defines:
@@ -371,6 +381,8 @@ Later templates, such as zero-based envelopes and debt snowball, are data, not c
   - Dashboard: `add_widget`, `update_widget`, `remove_widget`, `move_widget`.
 
   The plan tools handle requests like "drop weekly spending to $175 and put the difference toward my goal fund". The dashboard tools handle requests like "put my emergency fund at the top".
+
+**The assistant is how people shape Finnance** (section 1). Every building block (income sources, logged income, plans, buckets, limits, rules, bills, goals, widgets) has a tool backed by the same domain service as the UI, so "I'm paid every Friday by two clients and want 25% set aside for taxes" becomes a proposed configuration the user approves.
 
 ### How it works
 - A route handler runs the Claude tool-use loop and streams responses to the UI.
@@ -492,7 +504,7 @@ Each phase gets its own implementation plan and may be split further when planne
 - **Done when:** the owner uploads all 4 accounts' exports in under 2 minutes. Only transactions since the start date come in, totals are correct (UFCU↔Ally transfers excluded), the paycheck is matched to its income source, and balances match the banks.
 
 **Phase 2a: Start using it** *(the owner's clean-slate start; replaces the spreadsheet)*
-- Bucket engine, the Paycheck plan template (others in 2b), plan rules, paycheck tasks, and the Plan page.
+- Built in three parts: **2a-1** budget plans (bucket engine, per-income and monthly plans, the Paycheck plan and Start-from-scratch templates, plan rules, move tasks, log income, the Plan page); **2a-2** goals; **2a-3** first-run setup and Home.
 - The `budget.xlsx` plan as an automated test fixture.
 - Goals with starting amounts, contributions, bucket funding, projections, and priority roll-over.
 - Cold-start fallbacks (7.5).
@@ -510,6 +522,8 @@ Each phase gets its own implementation plan and may be split further when planne
 - **Done when:** the owner can rearrange Home and change the plan by tapping or by asking the assistant, and undo anything the AI did.
 
 *(Builder's call: Phase 2 is split so the owner can start using Finnance as soon as the plan works, rather than waiting for the assistant and dashboard editing.)*
+
+*(To revisit when planning after 2a: since the assistant is how people shape the app, Assistant v1 may move ahead of dashboard editing.)*
 
 **Phase 3: Hands-off**
 - SimpleFIN bank sync with scheduled syncs and balances.
