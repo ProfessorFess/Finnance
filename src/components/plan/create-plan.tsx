@@ -10,13 +10,13 @@ import { Label } from "@/components/ui/label";
 import { formatCents, parseAmountToCents } from "@/lib/money";
 import { cn } from "@/lib/utils";
 import type { FundingType, LimitPeriod, PlanCadence, PlanTemplate } from "@/server/db/finance-schema";
-import { type EngineBucket, fundIncome, incomesPerMonth, suggestedFunding } from "@/server/plan/engine";
+import { type EngineBucket, fundIncome, incomesPerMonth, planTypicalIncome, suggestedFunding } from "@/server/plan/engine";
 import type { BucketDraft } from "@/server/plan/templates";
-import { monthlyEquivalentCents } from "@/server/recurring/schedule";
 import type { Frequency } from "@/server/recurring/schedule";
 import { healthText } from "./health-chip";
 
-export type CreatePlanIncome = { id: string; name: string; frequency: Frequency; typicalCents: number | null; eventDates: string[] };
+/** planningCents: per occurrence (scheduled) or per month (irregular); null when paused or unknown. */
+export type CreatePlanIncome = { id: string; name: string; frequency: Frequency; planningCents: number | null; events: { date: string; amountCents: number }[] };
 export type CreatePlanTemplate = {
   key: PlanTemplate;
   name: string;
@@ -49,11 +49,13 @@ export function CreatePlan({
   incomes,
   accounts,
   billsMonthlyCents,
+  today,
 }: {
   templates: CreatePlanTemplate[];
   incomes: CreatePlanIncome[];
   accounts: { id: string; name: string }[];
   billsMonthlyCents: number;
+  today: string;
 }) {
   const [template, setTemplate] = useState<CreatePlanTemplate | null>(null);
   const [cadence, setCadence] = useState<PlanCadence>("per_income");
@@ -74,8 +76,9 @@ export function CreatePlan({
   };
 
   const selected = incomes.filter((i) => incomeIds.has(i.id));
-  const perMonth = cadence === "per_income" ? incomesPerMonth(selected.map((i) => ({ frequency: i.frequency, eventDates: i.eventDates })), today()) : 1;
-  const typical = typicalIncome(selected, cadence);
+  const perMonth = cadence === "per_income" ? incomesPerMonth(selected.map((i) => ({ frequency: i.frequency, eventDates: i.events.map((e) => e.date) })), today) : 1;
+  // The same math the Plan page uses, so the preview matches what you'll see after creating it.
+  const typical = planTypicalIncome(cadence, selected, today);
 
   const drafts = rows.map((r) => toDraft(r));
   const firstBills = drafts.findIndex((d) => d.fundingType === "sum_of_recurring");
@@ -172,7 +175,7 @@ export function CreatePlan({
                     className="size-4 accent-primary"
                   />
                   {i.name}
-                  {i.typicalCents !== null && <span className="num text-muted-foreground">≈ {formatCents(i.typicalCents)}</span>}
+                  <IncomeHint income={i} cadence={cadence} today={today} />
                 </label>
               ))}
             </div>
@@ -249,16 +252,15 @@ export function CreatePlan({
   );
 }
 
-function typicalIncome(selected: CreatePlanIncome[], cadence: PlanCadence): number | null {
-  const known = selected.filter((i) => i.typicalCents !== null);
-  if (known.length === 0) return null;
-  if (cadence === "per_income") return Math.round(known.reduce((s, i) => s + i.typicalCents!, 0) / known.length);
-  return known.reduce((s, i) => s + (i.frequency === "irregular" ? i.typicalCents! : monthlyEquivalentCents(i.typicalCents!, i.frequency)), 0);
-}
-
-function today(): string {
-  const d = new Date();
-  return `${d.getFullYear()}-${String(d.getMonth() + 1).padStart(2, "0")}-${String(d.getDate()).padStart(2, "0")}`;
+function IncomeHint({ income, cadence, today }: { income: CreatePlanIncome; cadence: PlanCadence; today: string }) {
+  const cents = planTypicalIncome(cadence, [income], today);
+  if (cents === null) return null;
+  return (
+    <span className="num text-muted-foreground">
+      ≈ {formatCents(cents)}
+      {cadence === "monthly" ? "/mo" : " each"}
+    </span>
+  );
 }
 
 const defaultPeriod = (cadence: PlanCadence): LimitPeriod => (cadence === "monthly" ? "monthly" : "weekly");

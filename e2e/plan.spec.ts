@@ -1,5 +1,5 @@
 import { expect, test } from "@playwright/test";
-import { PLAN_EDIT_USER, PLAN_SCRATCH_USER, PLAN_USER, signIn } from "./fixtures";
+import { PLAN_EDIT_USER, PLAN_SCRATCH_USER, PLAN_TWO_USER, PLAN_USER, signIn } from "./fixtures";
 
 test("creates the paycheck plan and shows the buckets", async ({ page, isMobile }) => {
   test.skip(isMobile, "stateful flow runs on desktop");
@@ -49,4 +49,19 @@ test("edits a bucket and sees the health check change", async ({ page, isMobile 
   await dialog.getByRole("button", { name: "Save" }).click();
   await expect(dialog).toBeHidden();
   await expect(page.getByText(/Over by/)).toBeVisible();
+});
+
+test("logs income for any of the plan's incomes", async ({ page, isMobile }) => {
+  test.skip(isMobile, "stateful flow runs on desktop");
+  await page.goto("/sign-in?next=/plan");
+  await signIn(page, PLAN_TWO_USER);
+  await page.getByRole("button", { name: "Log income" }).click();
+  const dialog = page.getByRole("dialog");
+  await dialog.getByLabel("Income", { exact: true }).selectOption({ label: "Tips" });
+  await dialog.getByLabel("Amount").fill("40");
+  await dialog.getByLabel("Date").fill("2026-11-12");
+  await dialog.getByRole("button", { name: "Save" }).click();
+  await expect(dialog).toBeHidden();
+  await page.goto("/recurring");
+  await expect(page.getByRole("listitem").filter({ hasText: "Tips" }).getByText("Last Nov 12, 2026")).toBeVisible();
 });

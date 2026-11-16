@@ -8,7 +8,10 @@ import {
   incomesPerMonth,
   isExtraIncome,
   limitWindow,
+  shareDestinations,
   suggestedFunding,
+  planTypicalIncome,
+  typicalPerIncome,
 } from "./engine";
 
 const b = (over: Partial<EngineBucket>): EngineBucket => ({ id: "x", role: "spending", fundingType: "fixed", fundingCents: null, fundingBps: null, limitCents: null, limitPeriod: null, trackCategoryIds: [], destinationAccountId: null, linkedRuleIds: [], linkedMonthlyCents: 0, ...over });
@@ -82,4 +85,42 @@ it("makes a move task per destination and ticks it off when the transfer lands",
     { bucketId: "sav", amountCents: 40_000, movedCents: 40_000, destinationAccountId: "ally-sav", done: true },
     { bucketId: "week", amountCents: 40_000, movedCents: 15_000, destinationAccountId: "ally-spend", done: false },
   ]);
+});
+
+it("shares one destination's transfers across the buckets that move there", () => {
+  const two = [
+    b({ id: "emergency", role: "savings", fundingCents: 10_000, destinationAccountId: "sav" }),
+    b({ id: "vacation", role: "savings", fundingCents: 10_000, destinationAccountId: "sav" }),
+  ];
+  const { funded } = fundIncome(two, 50_000, 2, null);
+  const rows: ActivityRow[] = [{ date: "2026-11-13", amountCents: 10_000, accountId: "sav", categoryId: null, isTransfer: true, recurringRuleId: null }];
+  expect(allocationTasks(two, funded, rows, { start: "2026-11-13", end: "2026-11-26" }).map((t) => [t.bucketId, t.movedCents, t.done])).toEqual([
+    ["emergency", 10_000, true],
+    ["vacation", 0, false],
+  ]);
+  expect(shareDestinations([
+    { id: "a", destinationAccountId: "sav", targetCents: 10_000, inflowCents: 25_000 },
+    { id: "b", destinationAccountId: "sav", targetCents: 10_000, inflowCents: 25_000 },
+    { id: "c", destinationAccountId: "other", targetCents: 40_000, inflowCents: 50_000 },
+  ])).toEqual(new Map([["a", 10_000], ["b", 15_000], ["c", 50_000]]));
+});
+
+it("finds a typical income from recent deposits, else from what's expected", () => {
+  expect(typicalPerIncome([{ date: "2026-11-03", amountCents: 30_000 }, { date: "2026-11-10", amountCents: 45_000 }, { date: "2026-11-17", amountCents: 25_000 }], [], "2026-11-20")).toBe(33_333);
+  expect(typicalPerIncome([{ date: "2026-05-01", amountCents: 99_000 }], [120_000, 80_000], "2026-11-20")).toBe(100_000);
+  expect(typicalPerIncome([], [], "2026-11-20")).toBeNull();
+});
+
+it("the create preview and the Plan page agree on a typical income", () => {
+  // A gig worker: the irregular source's planning amount is a monthly figure; per income, recent payouts win.
+  const payouts = [{ date: "2026-11-03", amountCents: 30_000 }, { date: "2026-11-10", amountCents: 45_000 }, { date: "2026-11-17", amountCents: 25_000 }];
+  const gig = [{ frequency: "irregular" as const, planningCents: 100_000, events: payouts }];
+  expect(planTypicalIncome("per_income", gig, "2026-11-20")).toBe(33_333);
+  expect(planTypicalIncome("monthly", gig, "2026-11-20")).toBe(100_000);
+  const household = [
+    { frequency: "semimonthly" as const, planningCents: 150_000, events: [] },
+    { frequency: "irregular" as const, planningCents: 60_000, events: [] },
+  ];
+  expect(planTypicalIncome("monthly", household, "2026-11-20")).toBe(360_000);
+  expect(planTypicalIncome("monthly", [{ frequency: "irregular" as const, planningCents: null, events: [] }], "2026-11-20")).toBeNull();
 });

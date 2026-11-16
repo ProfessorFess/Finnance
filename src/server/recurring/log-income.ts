@@ -1,7 +1,7 @@
-import { and, eq, inArray, isNotNull, ne } from "drizzle-orm";
+import { and, eq, inArray, isNotNull, isNull, ne, sql } from "drizzle-orm";
 import { daysBetween } from "@/lib/dates";
-import { activityLog, incomeSources, transactions } from "@/server/db/schema";
-import type { Database } from "@/server/db/types";
+import { activityLog, incomeSources, type MatchSource, transactions } from "@/server/db/schema";
+import type { Database, Executor } from "@/server/db/types";
 import { logActivity } from "@/server/finance/activity";
 import { NotFoundError, ValidationError } from "@/server/finance/errors";
 import { createManualTransaction } from "@/server/finance/transactions";
@@ -98,11 +98,53 @@ export async function supersedeLoggedIncome(db: Database, userId: string, insert
         .set({ incomeSourceId: p.log.incomeSourceId, expectedDate: p.log.expectedDate, matchSource: p.log.matchSource })
         .where(and(eq(transactions.id, p.deposit.id), eq(transactions.userId, userId)));
       await tx.insert(activityLog).values([
-        { userId, actor: "system" as const, action: "transaction.superseded", entityType: "transaction", entityId: p.log.id, after: { replacedBy: p.deposit.id } },
+        {
+          userId,
+          actor: "system" as const,
+          action: "transaction.superseded",
+          entityType: "transaction",
+          entityId: p.log.id,
+          // Kept so undoing the import can bring the logged income back.
+          before: { status: "cleared", incomeSourceId: p.log.incomeSourceId, expectedDate: p.log.expectedDate, matchSource: p.log.matchSource },
+          after: { replacedBy: p.deposit.id },
+        },
         { userId, actor: "system" as const, action: "transaction.superseded", entityType: "transaction", entityId: p.deposit.id, after: { replaces: p.log.id } },
       ]);
       replaced++;
     }
   });
   return replaced;
+}
+
+/**
+ * Undoing an import removes the bank's records; any income the user had
+ * logged by hand for those deposits comes back, linked as it was.
+ */
+export async function restoreLoggedIncome(tx: Executor, userId: string, removedDepositIds: string[]): Promise<number> {
+  if (removedDepositIds.length === 0) return 0;
+  const entries = await tx
+    .select()
+    .from(activityLog)
+    .where(
+      and(
+        eq(activityLog.userId, userId),
+        eq(activityLog.action, "transaction.superseded"),
+        inArray(sql`${activityLog.after}->>'replacedBy'`, removedDepositIds),
+      ),
+    );
+  let restored = 0;
+  for (const e of entries) {
+    const before = e.before as { status: string; incomeSourceId: string | null; expectedDate: string | null; matchSource: MatchSource | null } | null;
+    if (!before) continue;
+    const updated = await tx
+      .update(transactions)
+      .set({ status: before.status, incomeSourceId: before.incomeSourceId, expectedDate: before.expectedDate, matchSource: before.matchSource })
+      .where(and(eq(transactions.id, e.entityId), eq(transactions.userId, userId), eq(transactions.status, "excluded"), isNull(transactions.incomeSourceId)))
+      .returning({ id: transactions.id });
+    if (updated.length) {
+      restored++;
+      await tx.insert(activityLog).values({ userId, actor: "system", action: "transaction.unsuperseded", entityType: "transaction", entityId: e.entityId, after: before });
+    }
+  }
+  return restored;
 }

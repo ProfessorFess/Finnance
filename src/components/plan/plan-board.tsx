@@ -4,7 +4,6 @@ import { Pencil, Plus } from "lucide-react";
 import { useState } from "react";
 import { LogIncomeDialog } from "@/components/recurring/log-income-dialog";
 import { Button } from "@/components/ui/button";
-import { Label } from "@/components/ui/label";
 import type { PlanStatus } from "@/server/plan/status-service";
 import type { BucketDraft } from "@/server/plan/templates";
 import { BucketCard } from "./bucket-card";
@@ -33,8 +32,6 @@ export function PlanBoard({
   const [editing, setEditing] = useState(false);
   const [dialog, setDialog] = useState<{ open: boolean; bucket: { id: string; draft: BucketDraft } | null }>({ open: false, bucket: null });
   const [logging, setLogging] = useState(false);
-  const [sourceId, setSourceId] = useState(incomes[0]?.id ?? "");
-  const source = incomes.find((i) => i.id === sourceId) ?? null;
 
   return (
     <div className="flex flex-col gap-6">
@@ -70,19 +67,7 @@ export function PlanBoard({
           />
         </>
       )}
-      {incomes.length > 1 && logging && (
-        <div className="flex flex-col gap-1.5 text-sm">
-          <Label htmlFor="log-source">Log income for</Label>
-          <select id="log-source" value={sourceId} onChange={(e) => setSourceId(e.target.value)} className="h-8 rounded-lg border border-input bg-transparent px-2 text-sm">
-            {incomes.map((i) => (
-              <option key={i.id} value={i.id}>
-                {i.name}
-              </option>
-            ))}
-          </select>
-        </div>
-      )}
-      <LogIncomeDialog open={logging} onOpenChange={setLogging} source={source} accounts={accounts} today={status.today} />
+      <LogIncomeDialog open={logging} onOpenChange={setLogging} source={incomes[0] ?? null} sources={incomes} accounts={accounts} today={status.today} />
       <BucketDialog
         open={dialog.open}
         onOpenChange={(o) => setDialog((d) => ({ ...d, open: o }))}

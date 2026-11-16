@@ -26,8 +26,20 @@ export function IncomeCard({ status, onLog }: { status: PlanStatus; onLog: () =>
         <div>
           <p className="text-sm text-muted-foreground">{monthName(status.month.month)}</p>
           <p className="num text-3xl font-semibold">
-            {formatCents(status.month.receivedCents)} <span className="text-base font-normal text-muted-foreground">of ≈ {formatCents(status.month.expectedCents)} received</span>
+            {formatCents(status.month.receivedCents)}{" "}
+            <span className="text-base font-normal text-muted-foreground">
+              {status.month.expectedCents !== null ? `of ≈ ${formatCents(status.month.expectedCents)} received` : "received"}
+            </span>
           </p>
+          {status.month.expectedCents === null && (
+            <p className="mt-1 text-sm">
+              Set a typical amount for your income in{" "}
+              <Link href="/recurring" className="text-primary underline">
+                Recurring
+              </Link>
+              , or log income as it arrives.
+            </p>
+          )}
         </div>
       ) : status.latestIncome ? (
         <div>
@@ -36,6 +48,12 @@ export function IncomeCard({ status, onLog }: { status: PlanStatus; onLog: () =>
           </p>
           <p className="num text-3xl font-semibold text-primary">{formatCents(status.latestIncome.amountCents)}</p>
           {extraTo && <p className="mt-1 text-sm">Extra paycheck · it all goes to {extraTo}</p>}
+          {status.latestIncome.health.kind === "over" && (
+            <p className="mt-1 text-sm text-destructive">This income is {formatCents(status.latestIncome.health.cents)} short of the plan.</p>
+          )}
+          {status.latestIncome.health.kind === "unassigned" && !status.latestIncome.isExtra && (
+            <p className="mt-1 text-sm text-muted-foreground">{formatCents(status.latestIncome.health.cents)} of this income isn&apos;t assigned to a bucket.</p>
+          )}
         </div>
       ) : (
         <p className="text-sm">Waiting for your first income.</p>

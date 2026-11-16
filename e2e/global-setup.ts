@@ -26,6 +26,7 @@ import {
   REVIEW_USER_M,
   PLAN_EDIT_USER,
   PLAN_SCRATCH_USER,
+  PLAN_TWO_USER,
   PLAN_USER,
   RECURRING_LOG_USER,
   RECURRING_TRACK_USER,
@@ -115,6 +116,19 @@ export default async function globalSetup() {
   await createPlan(db, editUser.id, {
     template: "paycheck_plan", cadence: "per_income", name: "Paycheck plan", incomeSourceIds: [editPay.id],
     buckets: editDrafts.buckets, extraIncome: { bucketIndex: 0, incomeSourceId: editPay.id },
+  });
+  const twoUser = await seeded(PLAN_TWO_USER, [CHECKING]);
+  const dayJob = await createIncomeSource(db, twoUser.id, {
+    name: "Day job", type: "salary", frequency: "semimonthly", anchorDate: "2026-11-15", secondDay: 31, amountMode: "fixed",
+    expectedCents: 150000, accountId: twoUser.accounts[0]!.id, categoryId: null, matchPattern: "Acme Payroll",
+  });
+  const tips = await createIncomeSource(db, twoUser.id, {
+    name: "Tips", type: "side_income", frequency: "irregular", anchorDate: null, secondDay: null, amountMode: "varies",
+    expectedCents: 20000, accountId: twoUser.accounts[0]!.id, categoryId: null, matchPattern: "Tips",
+  });
+  await createPlan(db, twoUser.id, {
+    template: "custom", cadence: "monthly", name: "Our budget", incomeSourceIds: [dayJob.id, tips.id], extraIncome: null,
+    buckets: templateDrafts("custom", []).buckets,
   });
   const scratchUser = await seeded(PLAN_SCRATCH_USER, [CHECKING]);
   await createIncomeSource(db, scratchUser.id, {

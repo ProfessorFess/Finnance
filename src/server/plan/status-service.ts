@@ -12,12 +12,15 @@ import {
   type AllocationTask,
   allocationTasks,
   bucketActivity,
+  destinationInflow,
   type EngineBucket,
   fundIncome,
   type Health,
   incomesPerMonth,
   isExtraIncome,
   limitWindow,
+  planTypicalIncome,
+  shareDestinations,
 } from "./engine";
 import { bucketDraftOf, getActivePlan } from "./plans-service";
 import type { BucketDraft } from "./templates";
@@ -50,8 +53,10 @@ export type PlanStatus = {
   incomes: { id: string; name: string; scheduled: boolean }[];
   today: string;
   problem: null | "no_income";
-  latestIncome: { transactionId: string; sourceName: string; date: string; amountCents: number; isExtra: boolean } | null;
-  month: { month: string; expectedCents: number; receivedCents: number } | null;
+  /** The latest income, and whether it covered the plan (a small paycheck shows "Over by"). */
+  latestIncome: { transactionId: string; sourceName: string; date: string; amountCents: number; isExtra: boolean; health: Health } | null;
+  /** expectedCents is null when no income has an amount to expect yet. */
+  month: { month: string; expectedCents: number | null; receivedCents: number } | null;
   nextExpected: { sourceName: string; date: string; amountCents: number | null } | null;
   typicalIncomeCents: number | null;
   incomesPerMonth: number;
@@ -62,7 +67,6 @@ export type PlanStatus = {
 
 type IncomeEvent = { id: string; sourceId: string; date: string; expectedDate: string | null; amountCents: number };
 
-const LOOKBACK_DAYS = 90;
 
 function planningFor(source: IncomeSource, events: IncomeEvent[], today: string) {
   return planningAmount({
@@ -155,27 +159,31 @@ export async function getPlanStatus(db: Database, userId: string, now: Date = ne
     const position = sameMonth.filter((e) => key(e) < key(last) || (key(e) === key(last) && e.id <= last.id)).length;
     const isExtra = Boolean(rule && source.active && isExtraIncome(source.frequency, position));
     if (isExtra) extra = { bucketId: rule!.bucketId, bps: rule!.percentBps };
-    latestIncome = { transactionId: last.id, sourceName: source.name, date: last.date, amountCents: last.amountCents, isExtra };
+    latestIncome = {
+      transactionId: last.id,
+      sourceName: source.name,
+      date: last.date,
+      amountCents: last.amountCents,
+      isExtra,
+      health: fundIncome(engineBuckets, last.amountCents, perMonth, extra).health,
+    };
   }
 
   // A typical income: recent events, else what the sources are expected to pay.
-  let typicalIncomeCents: number | null;
   let monthView: PlanStatus["month"] = null;
-  if (perIncome) {
-    const recent = events.filter((e) => e.date >= addDays(today, -LOOKBACK_DAYS));
-    if (recent.length) typicalIncomeCents = Math.round(recent.reduce((s, e) => s + e.amountCents, 0) / recent.length);
-    else {
-      const expected = expectingSources.map((s) => planningFor(s, events, today).cents).filter((c): c is number => c !== null);
-      typicalIncomeCents = expected.length ? Math.round(expected.reduce((a, b) => a + b, 0) / expected.length) : null;
-    }
-  } else {
-    const expectedCents = expectingSources.reduce((sum, s) => {
-      const p = planningFor(s, events, today).cents ?? 0;
-      return sum + (s.frequency === "irregular" ? p : monthlyEquivalentCents(p, s.frequency));
-    }, 0);
+  const typicalIncomeCents = planTypicalIncome(
+    plan.cadence,
+    sources.map((s) => ({
+      frequency: s.frequency,
+      planningCents: s.active ? planningFor(s, events, today).cents : null,
+      events: events.filter((e) => e.sourceId === s.id),
+    })),
+    today,
+  );
+  if (!perIncome) {
+    const expectedCents = typicalIncomeCents;
     const receivedCents = events.filter((e) => e.date >= month.start && e.date <= month.end).reduce((s, e) => s + e.amountCents, 0);
     monthView = { month: today.slice(0, 7), expectedCents, receivedCents };
-    typicalIncomeCents = expectedCents;
   }
 
   const periodIncome = perIncome ? (last?.amountCents ?? null) : typicalIncomeCents;
@@ -209,6 +217,20 @@ export async function getPlanStatus(db: Database, userId: string, now: Date = ne
   const accountRows = await db.select({ id: accounts.id, name: accounts.name }).from(accounts).where(eq(accounts.userId, userId));
   const accountName = new Map(accountRows.map((a) => [a.id, a.name]));
 
+  // Buckets moving to the same account share its transfers instead of each counting all of them.
+  const savers = buckets.flatMap((b, i) =>
+    (b.role === "savings" || b.role === "goal") && b.destinationAccountId ? [{ b, eb: engineBuckets[i]! }] : [],
+  );
+  const inflows = new Map(savers.map(({ b }) => [b.id, destinationInflow(b.destinationAccountId!, rows, windows.get(b.id)!)]));
+  const shared = shareDestinations(
+    savers.map(({ b }) => ({
+      id: b.id,
+      destinationAccountId: b.destinationAccountId!,
+      targetCents: b.limitCents ?? funded.get(b.id) ?? 0,
+      inflowCents: inflows.get(b.id)!,
+    })),
+  );
+
   const views: BucketView[] = buckets.map((b, i) => {
     const eb = engineBuckets[i]!;
     const window = windows.get(b.id)!;
@@ -218,7 +240,8 @@ export async function getPlanStatus(db: Database, userId: string, now: Date = ne
     const target = perIncome && !last ? (typicalFundedCents ?? 0) : fundedCents;
     const monthlyTarget = Math.round((typicalFundedCents ?? fundedCents) * perMonth);
     const limitCents = b.limitCents ?? (saving ? target : b.role === "bills" ? monthlyTarget : null);
-    const activityCents = bucketActivity(eb, rows, window);
+    const raw = bucketActivity(eb, rows, window);
+    const activityCents = shared.has(b.id) ? raw - inflows.get(b.id)! + shared.get(b.id)! : raw;
     return {
       id: b.id,
       name: b.name,
@@ -273,4 +296,27 @@ export async function getPlanStatus(db: Database, userId: string, now: Date = ne
     buckets: views,
     tasks,
   };
+}
+
+/** Each income source's deposits from the last 90 days (for previews that must match the Plan page). */
+export async function recentIncomeEvents(db: Database, userId: string, now: Date = new Date()): Promise<Map<string, { date: string; amountCents: number }[]>> {
+  const settings = await getSettings(db, userId);
+  const today = todayInTimeZone(settings.timezone, now);
+  const since = addDays(today, -90);
+  const rows = await db
+    .select({ sourceId: transactions.incomeSourceId, date: transactions.date, amountCents: transactions.amountCents })
+    .from(transactions)
+    .where(
+      and(
+        eq(transactions.userId, userId),
+        sql`${transactions.incomeSourceId} is not null`,
+        ne(transactions.status, "excluded"),
+        sql`${transactions.amountCents} > 0`,
+        gte(transactions.date, settings.trackingStartDate && settings.trackingStartDate > since ? settings.trackingStartDate : since),
+        lte(transactions.date, today),
+      ),
+    );
+  const out = new Map<string, { date: string; amountCents: number }[]>();
+  for (const r of rows) out.set(r.sourceId!, [...(out.get(r.sourceId!) ?? []), { date: r.date, amountCents: r.amountCents }]);
+  return out;
 }

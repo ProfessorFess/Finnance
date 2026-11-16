@@ -6,7 +6,8 @@ import { commitImport } from "@/server/import/service";
 import { createIncomeSource, createRecurringRule, deleteIncomeSource, type IncomeSource, type IncomeSourceInput, updateIncomeSource } from "@/server/recurring/items-service";
 import { createTestDb } from "@/test/db";
 import { fixtureBytes } from "@/test/fixtures";
-import { createTestUser } from "@/test/users";
+import { createTestUser, insertTestTransaction } from "@/test/users";
+import { matchRecurring } from "@/server/recurring/matching-service";
 import { createPlan } from "./plans-service";
 import { getPlanStatus } from "./status-service";
 import { templateDrafts } from "./templates";
@@ -99,4 +100,29 @@ it("works with whatever income exists", async () => {
 
 it("returns null without a plan, and isolates users", async () => {
   expect(await getPlanStatus(t.db, B, now)).toBeNull();
+});
+
+it("shows when a small paycheck can't cover the plan", async () => {
+  await updateIncomeSource(t.db, A, pay.id, { ...income(), amountMode: "varies" });
+  await insertTestTransaction(t.db, A, checking.id, { amountCents: 50_000, date: "2026-11-28", description: "Payroll Acme Corp" });
+  await matchRecurring(t.db, A);
+  const s = (await getPlanStatus(t.db, A, new Date("2026-11-29T18:00:00Z")))!;
+  expect(s.latestIncome).toMatchObject({ amountCents: 50_000, health: { kind: "over", cents: 31_082 } });
+});
+
+it("a monthly plan with no expected amount doesn't claim it's over", async () => {
+  const tips = await createIncomeSource(t.db, B, { ...income(), name: "Tips", frequency: "irregular", anchorDate: null, amountMode: "varies", expectedCents: null, accountId: null, matchPattern: "Tips" });
+  await setTrackingStartDate(t.db, B, "2026-11-01");
+  await createPlan(t.db, B, {
+    template: "custom", cadence: "monthly", name: "B plan", incomeSourceIds: [tips.id], extraIncome: null,
+    buckets: [{ name: "Rent", role: "bills", icon: "wallet", fundingType: "fixed", fundingCents: 120_000, fundingBps: null, limitCents: null, limitPeriod: null, trackCategoryIds: [], destinationAccountId: null }],
+  });
+  const s = (await getPlanStatus(t.db, B, now))!;
+  expect(s.month).toMatchObject({ expectedCents: null });
+  expect(s.health).toBeNull();
+  expect(s.typicalIncomeCents).toBeNull();
+
+  await updateIncomeSource(t.db, A, pay.id, { ...income(), active: false });
+  const a = (await getPlanStatus(t.db, A, new Date("2026-11-10T18:00:00Z")))!;
+  expect(a.health).toBeNull();
 });

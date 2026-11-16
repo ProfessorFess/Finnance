@@ -4,7 +4,7 @@ import { transactions } from "@/server/db/schema";
 import { type Account, createAccount } from "@/server/finance/accounts";
 import { NotFoundError } from "@/server/finance/errors";
 import { setTrackingStartDate } from "@/server/finance/settings";
-import { commitImport } from "@/server/import/service";
+import { commitImport, undoImport } from "@/server/import/service";
 import { createTestDb } from "@/test/db";
 import { fixtureBytes } from "@/test/fixtures";
 import { createTestUser } from "@/test/users";
@@ -72,4 +72,13 @@ it("an imported deposit replaces the matching logged income", async () => {
 
   const o = await getRecurringOverview(t.db, A, new Date("2026-11-15T18:00:00Z"));
   expect(o.income[0]!.recentMatches.filter((m) => m.date === "2026-11-14" || m.date === "2026-11-13")).toHaveLength(1);
+});
+
+it("undoing the import brings the logged income back", async () => {
+  const pay = await createIncomeSource(t.db, A, paycheck());
+  const logged = await logIncome(t.db, A, { incomeSourceId: pay.id, accountId: checking.id, date: "2026-11-13", amountCents: 118_000 });
+  const result = await commitImport(t.db, A, { file: { name: "ufcu.csv", bytes: fixtureBytes("ufcu-checking.csv") }, accountId: checking.id });
+  expect(result.replacedLogged).toBe(1);
+  await undoImport(t.db, A, result.batchId);
+  expect(await get(logged.transactionId)).toMatchObject({ status: "cleared", incomeSourceId: pay.id, expectedDate: "2026-11-14", matchSource: "user" });
 });

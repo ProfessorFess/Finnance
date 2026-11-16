@@ -8,7 +8,7 @@ import { normalizeMerchant } from "@/server/categorize/normalize-merchant";
 import type { AiCategorizer } from "@/server/categorize/ai-categorizer";
 import { categorizeTransactions } from "@/server/categorize/pipeline";
 import { clearDanglingPairs, detectTransfers } from "@/server/categorize/transfers-service";
-import { supersedeLoggedIncome } from "@/server/recurring/log-income";
+import { restoreLoggedIncome, supersedeLoggedIncome } from "@/server/recurring/log-income";
 import { matchRecurring } from "@/server/recurring/matching-service";
 import { assignOccurrences, dedupeHash } from "./dedupe";
 import { headerSignature } from "./detect";
@@ -328,6 +328,7 @@ export async function undoImport(db: Database, userId: string, batchId: string):
       .returning({ id: transactions.id });
     await tx.update(importBatches).set({ undoneAt: new Date() }).where(eq(importBatches.id, batchId));
     await clearDanglingPairs(tx, userId);
+    await restoreLoggedIncome(tx, userId, removed.map((r) => r.id));
     await logActivity(tx, {
       userId,
       actor: "user",

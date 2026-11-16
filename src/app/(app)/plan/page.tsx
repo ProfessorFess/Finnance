@@ -10,7 +10,7 @@ import { listAccounts } from "@/server/finance/accounts";
 import { listCategories } from "@/server/finance/categories";
 import { getSettings } from "@/server/finance/settings";
 import { getActivePlan } from "@/server/plan/plans-service";
-import { getPlanStatus } from "@/server/plan/status-service";
+import { getPlanStatus, recentIncomeEvents } from "@/server/plan/status-service";
 import { PLAN_TEMPLATES, templateDrafts } from "@/server/plan/templates";
 import type { IncomeSource } from "@/server/recurring/items-service";
 import { getRecurringOverview } from "@/server/recurring/overview";
@@ -87,6 +87,7 @@ export default async function PlanPage() {
     );
   }
 
+  const history = await recentIncomeEvents(db, user.id);
   const templates: CreatePlanTemplate[] = PLAN_TEMPLATES.map((t) => {
     const drafts = templateDrafts(t.key, categories);
     return { key: t.key, name: t.name, description: t.description, cadence: t.cadence, buckets: drafts.buckets, extraIncomeBucket: drafts.extraIncomeBucket };
@@ -100,9 +101,10 @@ export default async function PlanPage() {
           id: v.item.id,
           name: v.name,
           frequency: (v.item as IncomeSource).frequency,
-          typicalCents: v.amountCents,
-          eventDates: v.recentMatches.map((m) => m.date),
+          planningCents: v.item.active ? v.amountCents : null,
+          events: history.get(v.item.id) ?? [],
         }))}
+        today={overview.today}
         accounts={accountOptions}
         billsMonthlyCents={overview.monthlyBillsCents}
       />

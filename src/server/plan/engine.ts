@@ -5,7 +5,7 @@
  */
 import { addDays, daysBetween, monthWindow, weekWindow } from "@/lib/dates";
 import type { BucketRole, FundingType, LimitPeriod, PlanCadence } from "@/server/db/finance-schema";
-import type { Frequency, ScheduledFrequency } from "@/server/recurring/schedule";
+import { type Frequency, monthlyEquivalentCents, type ScheduledFrequency } from "@/server/recurring/schedule";
 
 /** Regular paychecks a month (the spreadsheet's convention: a 3rd biweekly or 5th weekly check is extra). */
 export const PAYCHECKS_PER_MONTH: Record<ScheduledFrequency, number> = {
@@ -172,6 +172,35 @@ export function bucketActivity(bucket: EngineBucket, rows: ActivityRow[], window
 
 export type AllocationTask = { bucketId: string; amountCents: number; movedCents: number; destinationAccountId: string; done: boolean };
 
+/** Transfers that landed in an account during a window. */
+export function destinationInflow(accountId: string, rows: ActivityRow[], window: { start: string; end: string }): number {
+  return rows
+    .filter((r) => inWindow(r, window) && r.accountId === accountId && r.isTransfer && r.amountCents > 0)
+    .reduce((sum, r) => sum + r.amountCents, 0);
+}
+
+/**
+ * When several buckets move money to the same account, one transfer can't
+ * count for all of them: the account's transfers are handed out in bucket
+ * order, each up to its target, and the last one takes whatever is left.
+ */
+export function shareDestinations(
+  entries: { id: string; destinationAccountId: string; targetCents: number; inflowCents: number }[],
+): Map<string, number> {
+  const out = new Map<string, number>();
+  const groups = new Map<string, typeof entries>();
+  for (const e of entries) groups.set(e.destinationAccountId, [...(groups.get(e.destinationAccountId) ?? []), e]);
+  for (const group of groups.values()) {
+    let pool = Math.max(...group.map((e) => e.inflowCents));
+    group.forEach((e, i) => {
+      const share = i === group.length - 1 ? pool : Math.min(pool, Math.max(0, e.targetCents));
+      out.set(e.id, share);
+      pool -= share;
+    });
+  }
+  return new Map(entries.map((e) => [e.id, out.get(e.id) ?? 0]));
+}
+
 /** "Move $400 to Ally Savings" for each bucket with a destination, ticked off by transfers that land there. */
 export function allocationTasks(
   buckets: EngineBucket[],
@@ -179,14 +208,48 @@ export function allocationTasks(
   rows: ActivityRow[],
   window: { start: string; end: string },
 ): AllocationTask[] {
-  const tasks: AllocationTask[] = [];
-  for (const b of buckets) {
-    const amountCents = funded.get(b.id) ?? 0;
-    if (!b.destinationAccountId || amountCents <= 0) continue;
-    const movedCents = rows
-      .filter((r) => inWindow(r, window) && r.accountId === b.destinationAccountId && r.isTransfer && r.amountCents > 0)
-      .reduce((sum, r) => sum + r.amountCents, 0);
-    tasks.push({ bucketId: b.id, amountCents, movedCents, destinationAccountId: b.destinationAccountId, done: movedCents >= amountCents });
+  const due = buckets.filter((b) => b.destinationAccountId && (funded.get(b.id) ?? 0) > 0);
+  const moved = shareDestinations(
+    due.map((b) => ({ id: b.id, destinationAccountId: b.destinationAccountId!, targetCents: funded.get(b.id)!, inflowCents: destinationInflow(b.destinationAccountId!, rows, window) })),
+  );
+  return due.map((b) => {
+    const amountCents = funded.get(b.id)!;
+    const movedCents = moved.get(b.id) ?? 0;
+    return { bucketId: b.id, amountCents, movedCents, destinationAccountId: b.destinationAccountId!, done: movedCents >= amountCents };
+  });
+}
+
+/**
+ * A typical income: the mean of the deposits in the last 90 days, else the
+ * mean of what the sources are expected to pay, else unknown.
+ */
+export function typicalPerIncome(events: { date: string; amountCents: number }[], expected: number[], today: string): number | null {
+  const since = addDays(today, -LOOKBACK_DAYS);
+  const recent = events.filter((e) => e.date >= since && e.date <= today);
+  if (recent.length) return Math.round(recent.reduce((s, e) => s + e.amountCents, 0) / recent.length);
+  return expected.length ? Math.round(expected.reduce((a, b) => a + b, 0) / expected.length) : null;
+}
+
+/**
+ * A plan's typical income, the same everywhere (the create preview and the
+ * Plan page): per income, recent deposits or else what's expected; per month,
+ * the sum of what each source is expected to bring in a month (null when
+ * nothing has an amount yet). `planningCents` is per occurrence for scheduled
+ * sources and per month for irregular ones; pass null for paused sources.
+ */
+export function planTypicalIncome(
+  cadence: PlanCadence,
+  sources: { frequency: Frequency; planningCents: number | null; events: { date: string; amountCents: number }[] }[],
+  today: string,
+): number | null {
+  const known = sources.filter((s): s is typeof s & { planningCents: number } => s.planningCents !== null);
+  if (cadence === "per_income") {
+    return typicalPerIncome(
+      sources.flatMap((s) => s.events),
+      known.map((s) => s.planningCents),
+      today,
+    );
   }
-  return tasks;
+  if (known.length === 0) return null;
+  return known.reduce((sum, s) => sum + (s.frequency === "irregular" ? s.planningCents : monthlyEquivalentCents(s.planningCents, s.frequency)), 0);
 }
