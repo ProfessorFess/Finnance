@@ -124,3 +124,15 @@ Finnance sorts most transactions with rules and your past choices. For new merch
 
 What gets sent to Anthropic: for each new merchant, its cleaned name, the bank's description, the amount, and the bank's own category, plus a few of your past choices as examples. Nothing else.
 
+
+## 12. Add your paycheck and bills
+
+Enter each paycheck, bill, and subscription once. Finnance then expects it, links it when it shows up in an import, and tells you if it's late.
+
+1. In **Transactions**, open your most recent paycheck deposit and tap **Track as recurring**. Choose **Every 2 weeks**, leave **Amount is: Varies**, and save. From now on each paycheck is linked automatically.
+2. Do the same for each bill or subscription you see, or open **Recurring → Add**. Finnance also suggests repeating charges it notices ("Looks like Netflix, $15.49 monthly. Track it?"); tap **Track** or **Dismiss**.
+3. After each import, the summary says how many items matched. **Recurring** shows anything **Late** (it was expected, your imported data covers that date, and it never arrived) or **Waiting for import** (it's due, but you haven't imported that far yet).
+
+✅ Your latest paycheck shows under **Recurring → Income** with its date, and the next payday is two weeks later.
+
+If a match is wrong, open the transaction and tap **Not this one**. If a payment was missed because it came unusually late, link it by hand with **Part of…**. Finnance never changes either choice afterward.
