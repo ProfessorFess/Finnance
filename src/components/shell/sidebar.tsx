@@ -6,11 +6,11 @@ import { usePathname } from "next/navigation";
 import { Wordmark } from "@/components/brand";
 import { cn } from "@/lib/utils";
 import { useAssistant } from "./assistant-sheet";
-import { isActive, navItems } from "./nav-items";
+import { isActive, navItems, setupNavItem } from "./nav-items";
 import { SignOutButton } from "./sign-out-button";
 import { ThemeToggle } from "./theme-toggle";
 
-export function Sidebar({ email }: { email: string }) {
+export function Sidebar({ email, showSetup = false }: { email: string; showSetup?: boolean }) {
   const pathname = usePathname();
   const assistant = useAssistant();
 
@@ -32,7 +32,7 @@ export function Sidebar({ email }: { email: string }) {
       </button>
 
       <nav aria-label="Main" className="flex flex-1 flex-col gap-0.5">
-        {navItems.map(({ href, label, icon: Icon }) => {
+        {(showSetup ? [...navItems, setupNavItem] : navItems).map(({ href, label, icon: Icon }) => {
           const active = isActive(pathname, href);
           return (
             <Link

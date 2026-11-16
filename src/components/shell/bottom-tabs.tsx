@@ -7,12 +7,12 @@ import { useState } from "react";
 import { Sheet, SheetContent, SheetHeader, SheetTitle } from "@/components/ui/sheet";
 import { cn } from "@/lib/utils";
 import { useAssistant } from "./assistant-sheet";
-import { isActive, navItems } from "./nav-items";
+import { isActive, navItems, setupNavItem } from "./nav-items";
 import { SignOutButton } from "./sign-out-button";
 import { ThemeToggle } from "./theme-toggle";
 
 const tabs = navItems.filter((i) => i.mobileTab);
-const more = navItems.filter((i) => !i.mobileTab);
+const moreItems = navItems.filter((i) => !i.mobileTab);
 
 function TabLink({ href, label, icon: Icon, active }: (typeof navItems)[number] & { active: boolean }) {
   return (
@@ -30,7 +30,8 @@ function TabLink({ href, label, icon: Icon, active }: (typeof navItems)[number] 
   );
 }
 
-export function BottomTabs() {
+export function BottomTabs({ showSetup = false }: { showSetup?: boolean }) {
+  const more = showSetup ? [...moreItems, setupNavItem] : moreItems;
   const pathname = usePathname();
   const assistant = useAssistant();
   const [moreOpen, setMoreOpen] = useState(false);

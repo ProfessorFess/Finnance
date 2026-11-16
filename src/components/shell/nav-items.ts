@@ -4,6 +4,7 @@ import {
   Goal,
   House,
   Landmark,
+  ListChecks,
   ListOrdered,
   PieChart,
   Settings,
@@ -23,6 +24,9 @@ export const navItems: NavItem[] = [
   { href: "/import", label: "Import", icon: ArrowDownToLine, mobileTab: false },
   { href: "/settings", label: "Settings", icon: Settings, mobileTab: false },
 ];
+
+/** Shown in the nav only while first-run setup isn't finished. */
+export const setupNavItem: NavItem = { href: "/setup", label: "Setup", icon: ListChecks, mobileTab: false };
 
 export function isActive(pathname: string, href: string) {
   return href === "/" ? pathname === "/" : pathname === href || pathname.startsWith(`${href}/`);

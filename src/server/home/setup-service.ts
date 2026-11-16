@@ -2,7 +2,9 @@ import { and, count, eq, isNull } from "drizzle-orm";
 import { accounts, budgetPlans, goals, incomeSources, recurringRules, userSettings } from "@/server/db/schema";
 import type { Database } from "@/server/db/types";
 import { logActivity } from "@/server/finance/activity";
+import { ValidationError } from "@/server/finance/errors";
 import { getSettings } from "@/server/finance/settings";
+import { createRecurringRule } from "@/server/recurring/items-service";
 
 export type SetupStepKey = "start_date" | "accounts" | "income" | "plan" | "bills" | "goals";
 
@@ -18,19 +20,7 @@ export const SETUP_STEPS: { key: SetupStepKey; title: string }[] = [
   { key: "goals", title: "Add your goals" },
 ];
 
-/** Common subscriptions with typical US prices; amounts are editable before they're added. */
-export const COMMON_SUBSCRIPTIONS: { name: string; cents: number; matchPattern: string }[] = [
-  { name: "Netflix", cents: 1549, matchPattern: "Netflix" },
-  { name: "Spotify", cents: 1199, matchPattern: "Spotify" },
-  { name: "Hulu", cents: 999, matchPattern: "Hulu" },
-  { name: "Disney+", cents: 1599, matchPattern: "Disney" },
-  { name: "YouTube Premium", cents: 1399, matchPattern: "YouTube" },
-  { name: "Amazon Prime", cents: 1499, matchPattern: "Amazon Prime" },
-  { name: "Apple iCloud+", cents: 299, matchPattern: "Apple.com/bill" },
-  { name: "Max", cents: 1699, matchPattern: "Max.com" },
-  { name: "Peacock", cents: 799, matchPattern: "Peacock" },
-  { name: "Paramount+", cents: 799, matchPattern: "Paramount" },
-];
+export { COMMON_SUBSCRIPTIONS } from "./common-subscriptions";
 
 async function has(q: Promise<{ n: number }[]>): Promise<boolean> {
   const [row] = await q;
@@ -81,3 +71,17 @@ async function setSkipped(db: Database, userId: string, key: SetupStepKey, skip:
 export const skipSetupStep = (db: Database, userId: string, key: SetupStepKey) => setSkipped(db, userId, key, true);
 /** Puts a skipped step back on the list. */
 export const unskipSetupStep = (db: Database, userId: string, key: SetupStepKey) => setSkipped(db, userId, key, false);
+
+export type PickedSubscription = { name: string; cents: number; matchPattern: string; anchorDate: string };
+
+/** Adds the subscriptions picked from the common list as monthly items (paid from the plan's bills bucket, if any). */
+export async function addCommonSubscriptions(db: Database, userId: string, items: PickedSubscription[]): Promise<number> {
+  for (const i of items) if (!Number.isInteger(i.cents) || i.cents <= 0) throw new ValidationError(`Enter an amount for ${i.name}`);
+  for (const i of items) {
+    await createRecurringRule(db, userId, {
+      name: i.name, kind: "subscription", frequency: "monthly", anchorDate: i.anchorDate, secondDay: null, expectedCents: i.cents,
+      amountVaries: false, toleranceCents: null, accountId: null, categoryId: null, matchPattern: i.matchPattern,
+    });
+  }
+  return items.length;
+}

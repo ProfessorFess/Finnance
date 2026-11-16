@@ -8,7 +8,7 @@ import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
 import { formatDisplayDate } from "@/lib/dates";
 
-export function StartDateCard({ startDate }: { startDate: string | null }) {
+export function StartDateCard({ startDate, onSaved }: { startDate: string | null; onSaved?: () => void }) {
   const [editing, setEditing] = useState(startDate === null);
   const [error, setError] = useState<string | null>(null);
   const [pending, startTransition] = useTransition();
@@ -47,6 +47,7 @@ export function StartDateCard({ startDate }: { startDate: string | null }) {
             if (res.ok) {
               setError(null);
               setEditing(false);
+              onSaved?.();
             } else setError(res.error);
           })
         }

@@ -50,12 +50,14 @@ export function CreatePlan({
   accounts,
   billsMonthlyCents,
   today,
+  onCreated,
 }: {
   templates: CreatePlanTemplate[];
   incomes: CreatePlanIncome[];
   accounts: { id: string; name: string }[];
   billsMonthlyCents: number;
   today: string;
+  onCreated?: () => void;
 }) {
   const [template, setTemplate] = useState<CreatePlanTemplate | null>(null);
   const [cadence, setCadence] = useState<PlanCadence>("per_income");
@@ -112,7 +114,10 @@ export function CreatePlan({
         extraIncome: cadence === "per_income" && extra && extraIndex >= 0 && incomeIds.has(extra.incomeSourceId) ? { bucketIndex: extraIndex, incomeSourceId: extra.incomeSourceId } : null,
       });
       if ("error" in res) setError(res.error);
-      else toast.success("Your plan is set up");
+      else {
+        toast.success("Your plan is set up");
+        onCreated?.();
+      }
     });
 
   const extraSource = extra ? incomes.find((i) => i.id === extra.incomeSourceId) : undefined;
