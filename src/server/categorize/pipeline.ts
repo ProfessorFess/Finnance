@@ -170,22 +170,32 @@ export async function categorizeTransactions(
 
   await db.transaction(async (tx) => {
     const written = new Set<string>();
+    // Rows with the same outcome are written together (one UPDATE per outcome,
+    // in chunks), so a 5,000-row import isn't 5,000 round trips.
+    const groups = new Map<string, Decision[]>();
     for (const d of decisions) {
-      // Re-check eligibility at write time: the user may have chosen a category
-      // (or a transfer may have been paired) while this run was working.
-      const updated = await tx
-        .update(transactions)
-        .set({ categoryId: d.categoryId, categorizationSource: d.source, categorizationConfidence: d.confidence, needsReview: d.needsReview })
-        .where(
-          and(
-            eq(transactions.id, d.id),
-            eq(transactions.userId, userId),
-            sql`${transactions.categorizationSource} is distinct from 'user'`,
-            or(isNull(transactions.transferPairId), eq(transactions.transferPairId, NOT_A_TRANSFER)),
-          ),
-        )
-        .returning({ id: transactions.id });
-      if (updated.length) written.add(d.id);
+      const key = JSON.stringify([d.categoryId, d.source, d.confidence, d.needsReview]);
+      groups.set(key, [...(groups.get(key) ?? []), d]);
+    }
+    for (const group of groups.values()) {
+      const { categoryId, source, confidence, needsReview } = group[0]!;
+      for (const ids of chunk(group.map((d) => d.id), 1000)) {
+        // Re-check eligibility at write time: the user may have chosen a category
+        // (or a transfer may have been paired) while this run was working.
+        const updated = await tx
+          .update(transactions)
+          .set({ categoryId, categorizationSource: source, categorizationConfidence: confidence, needsReview })
+          .where(
+            and(
+              inArray(transactions.id, ids),
+              eq(transactions.userId, userId),
+              sql`${transactions.categorizationSource} is distinct from 'user'`,
+              or(isNull(transactions.transferPairId), eq(transactions.transferPairId, NOT_A_TRANSFER)),
+            ),
+          )
+          .returning({ id: transactions.id });
+        for (const u of updated) written.add(u.id);
+      }
     }
     const changed = decisions.filter((d) => d.source !== null && written.has(d.id));
     if (changed.length) {
