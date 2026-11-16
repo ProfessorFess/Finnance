@@ -4,7 +4,7 @@ import { activityLog, dashboards } from "@/server/db/schema";
 import { type Account, createAccount } from "@/server/finance/accounts";
 import { setTrackingStartDate } from "@/server/finance/settings";
 import { ownerPlan } from "@/server/goals/test-helpers";
-import { deletePlan, getActivePlan } from "@/server/plan/plans-service";
+import { bucketDraftOf, deletePlan, getActivePlan, updateBucket } from "@/server/plan/plans-service";
 import { createTestDb } from "@/test/db";
 import { createTestUser } from "@/test/users";
 import { ensureHomeDashboard, loadHome } from "./dashboard-service";
@@ -75,4 +75,30 @@ it("isolates users", async () => {
   expect(b.dashboardId).not.toBe(a.dashboardId);
   expect(b.widgets[0]!.type).toBe("needs_attention");
   expect(b.widgets.some((w) => a.widgets.some((x) => x.id === w.id))).toBe(false);
+});
+
+it("two loads at once after a plan change keep one layout", async () => {
+  await ensureHomeDashboard(t.db, A);
+  await ownerPlan(t.db, A, checking.id, savings.id);
+  await Promise.all([ensureHomeDashboard(t.db, A), ensureHomeDashboard(t.db, A), ensureHomeDashboard(t.db, A)]);
+  expect(await types(A)).toHaveLength(8);
+  // Requests that read the old layout before another one reset it must not reset again (on Postgres that duplicates widgets).
+  const resets = await t.db.select().from(activityLog).where(and(eq(activityLog.userId, A), eq(activityLog.action, "dashboard.reset")));
+  expect(resets).toHaveLength(1);
+});
+
+it("two first loads at once make one dashboard", async () => {
+  const [x, y] = await Promise.all([ensureHomeDashboard(t.db, B), ensureHomeDashboard(t.db, B)]);
+  expect(x.dashboardId).toBe(y.dashboardId);
+  expect(await types(B)).toHaveLength(5);
+});
+
+it("leaves the spending card out when no bucket has a limit", async () => {
+  await ownerPlan(t.db, A, checking.id, savings.id);
+  const plan = (await getActivePlan(t.db, A))!;
+  const weekly = plan.buckets.find((b) => b.name === "Weekly spending")!;
+  await updateBucket(t.db, A, weekly.id, { ...bucketDraftOf(weekly), limitCents: null, limitPeriod: null });
+  const home = await loadHome(t.db, A, now);
+  expect(home.widgets.map((w) => w.type)).not.toContain("bucket_status");
+  expect(home.widgets.map((w) => w.type)).toContain("paycheck_tasks");
 });

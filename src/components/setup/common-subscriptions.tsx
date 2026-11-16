@@ -11,10 +11,11 @@ import { COMMON_SUBSCRIPTIONS } from "@/server/home/common-subscriptions";
 const toInput = (cents: number) => (cents / 100).toFixed(2);
 
 /** A checklist of common subscriptions with editable prices. */
-export function CommonSubscriptions({ today, exclude, onAdded }: { today: string; exclude: Set<string>; onAdded: () => void }) {
+export function CommonSubscriptions({ exclude, onAdded }: { exclude: Set<string>; onAdded: () => void }) {
   const options = COMMON_SUBSCRIPTIONS.filter((s) => !exclude.has(s.name.toLowerCase()));
   const [picked, setPicked] = useState<Set<string>>(new Set());
   const [amounts, setAmounts] = useState<Record<string, string>>(() => Object.fromEntries(COMMON_SUBSCRIPTIONS.map((s) => [s.name, toInput(s.cents)])));
+  const [days, setDays] = useState<Record<string, string>>({});
   const [pending, startTransition] = useTransition();
   if (options.length === 0) return null;
 
@@ -22,11 +23,12 @@ export function CommonSubscriptions({ today, exclude, onAdded }: { today: string
     startTransition(async () => {
       const items = options
         .filter((s) => picked.has(s.name))
-        .map((s) => ({ name: s.name, matchPattern: s.matchPattern, anchorDate: today, cents: parseAmountToCents(amounts[s.name] ?? "") ?? 0 }));
+        .map((s) => ({ name: s.name, matchPattern: s.matchPattern, day: Number(days[s.name] || 0), cents: parseAmountToCents(amounts[s.name] ?? "") ?? 0 }));
       const res = await addCommonSubscriptionsAction(items);
       if ("error" in res) return void toast.error(res.error);
       toast.success(`Added ${res.added} ${res.added === 1 ? "subscription" : "subscriptions"}`);
       setPicked(new Set());
+      setDays({});
       onAdded();
     });
 
@@ -55,6 +57,16 @@ export function CommonSubscriptions({ today, exclude, onAdded }: { today: string
               <label htmlFor={id} className="flex-1 text-sm">
                 {s.name}
               </label>
+              {picked.has(s.name) && (
+                <Input
+                  aria-label={`${s.name} billing day`}
+                  inputMode="numeric"
+                  placeholder="Day"
+                  className="num h-8 w-16 text-right"
+                  value={days[s.name] ?? ""}
+                  onChange={(e) => setDays((d) => ({ ...d, [s.name]: e.target.value.replace(/\D/g, "").slice(0, 2) }))}
+                />
+              )}
               <Input
                 aria-label={`${s.name} price`}
                 inputMode="decimal"

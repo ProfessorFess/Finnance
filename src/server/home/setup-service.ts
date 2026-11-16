@@ -2,6 +2,7 @@ import { and, count, eq, isNull } from "drizzle-orm";
 import { accounts, budgetPlans, goals, incomeSources, recurringRules, userSettings } from "@/server/db/schema";
 import type { Database } from "@/server/db/types";
 import { logActivity } from "@/server/finance/activity";
+import { monthWindow, todayInTimeZone } from "@/lib/dates";
 import { ValidationError } from "@/server/finance/errors";
 import { getSettings } from "@/server/finance/settings";
 import { createRecurringRule } from "@/server/recurring/items-service";
@@ -72,15 +73,24 @@ export const skipSetupStep = (db: Database, userId: string, key: SetupStepKey) =
 /** Puts a skipped step back on the list. */
 export const unskipSetupStep = (db: Database, userId: string, key: SetupStepKey) => setSkipped(db, userId, key, false);
 
-export type PickedSubscription = { name: string; cents: number; matchPattern: string; anchorDate: string };
+export type PickedSubscription = { name: string; cents: number; matchPattern: string; /** Day of the month it bills (1–31). */ day: number };
 
-/** Adds the subscriptions picked from the common list as monthly items (paid from the plan's bills bucket, if any). */
-export async function addCommonSubscriptions(db: Database, userId: string, items: PickedSubscription[]): Promise<number> {
-  for (const i of items) if (!Number.isInteger(i.cents) || i.cents <= 0) throw new ValidationError(`Enter an amount for ${i.name}`);
+/**
+ * Adds the subscriptions picked from the common list as monthly items (paid from the plan's bills bucket, if any),
+ * each first expected on its billing day this month, so matching looks around the right date.
+ */
+export async function addCommonSubscriptions(db: Database, userId: string, items: PickedSubscription[], now: Date = new Date()): Promise<number> {
+  for (const i of items) {
+    if (!Number.isInteger(i.cents) || i.cents <= 0) throw new ValidationError(`Enter an amount for ${i.name}`);
+    if (!Number.isInteger(i.day) || i.day < 1 || i.day > 31) throw new ValidationError(`Enter the day ${i.name} bills`);
+  }
+  const { timezone } = await getSettings(db, userId);
+  const { start, end } = monthWindow(todayInTimeZone(timezone, now));
+  const lastDay = Number(end.slice(8, 10));
   for (const i of items) {
     await createRecurringRule(db, userId, {
-      name: i.name, kind: "subscription", frequency: "monthly", anchorDate: i.anchorDate, secondDay: null, expectedCents: i.cents,
-      amountVaries: false, toleranceCents: null, accountId: null, categoryId: null, matchPattern: i.matchPattern,
+      name: i.name, kind: "subscription", frequency: "monthly", anchorDate: `${start.slice(0, 8)}${String(Math.min(i.day, lastDay)).padStart(2, "0")}`,
+      secondDay: null, expectedCents: i.cents, amountVaries: false, toleranceCents: null, accountId: null, categoryId: null, matchPattern: i.matchPattern,
     });
   }
   return items.length;

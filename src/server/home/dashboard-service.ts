@@ -39,9 +39,16 @@ export async function ensureHomeDashboard(db: Database, userId: string): Promise
   } else if (!dash.customized && dash.layoutKey !== key) {
     const d = dash;
     await db.transaction(async (tx) => {
+      // Claim the reset first: a request that read the old layout after another one already reset it
+      // matches nothing here and leaves the widgets alone (otherwise both insert a layout).
+      const [claimed] = await tx
+        .update(dashboards)
+        .set({ layoutKey: key, updatedAt: new Date() })
+        .where(and(eq(dashboards.id, d.id), eq(dashboards.userId, userId), eq(dashboards.layoutKey, d.layoutKey), eq(dashboards.customized, false)))
+        .returning({ id: dashboards.id });
+      if (!claimed) return;
       await tx.delete(dashboardWidgets).where(and(eq(dashboardWidgets.dashboardId, d.id), eq(dashboardWidgets.userId, userId)));
       await insertLayout(tx, userId, d.id, key);
-      await tx.update(dashboards).set({ layoutKey: key, updatedAt: new Date() }).where(eq(dashboards.id, d.id));
       await logActivity(tx, {
         userId, actor: "system", action: "dashboard.reset", entityType: "dashboard", entityId: d.id, before: { layoutKey: d.layoutKey }, after: { layoutKey: key },
       });
@@ -64,7 +71,8 @@ export async function loadHome(db: Database, userId: string, now: Date = new Dat
       return r && { id: w.id, size: w.size, type: r.type, data: r.data };
     }),
   );
-  const shown = loaded.filter((w): w is HomeWidget => w !== null);
+  // A spending card with no limited bucket to show is left out rather than shown empty.
+  const shown = loaded.filter((w): w is HomeWidget => w !== null && !(w.type === "bucket_status" && w.data === null));
   if (!setup.complete) shown.unshift({ id: "setup", size: "full", type: "setup", data: setup });
   return { widgets: shown, setupIncomplete: !setup.complete };
 }

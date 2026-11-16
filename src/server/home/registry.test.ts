@@ -1,7 +1,7 @@
 import { afterEach, beforeEach, expect, it } from "vitest";
 import { type Account, createAccount } from "@/server/finance/accounts";
 import { setTrackingStartDate } from "@/server/finance/settings";
-import { createGoal, type GoalInput } from "@/server/goals/goals-service";
+import { createGoal, type GoalInput, setGoalStatus } from "@/server/goals/goals-service";
 import { ownerPlan } from "@/server/goals/test-helpers";
 import { createTestDb } from "@/test/db";
 import { createTestUser } from "@/test/users";
@@ -55,4 +55,14 @@ it("every widget loads for a brand-new user", async () => {
   const fresh = (await createTestUser(t.db)).id;
   for (const type of ["setup", "bucket_status", "paycheck_tasks", "plan_overview", "goals", "upcoming", "spending_by_category", "needs_attention", "recent_transactions"])
     expect(await loadWidget(t.db, fresh, { type, config: {} }, now)).toMatchObject({ type });
+});
+
+it("Home's goals skip finished ones unless a goal is chosen", async () => {
+  const done = await createGoal(t.db, A, goal("Emergency fund"));
+  await createGoal(t.db, A, goal("Roth IRA"));
+  await setGoalStatus(t.db, A, done.id, "completed");
+  const top = await loadWidget(t.db, A, { type: "goals", config: {} }, now);
+  expect((top!.data as { name: string }[]).map((g) => g.name)).toEqual(["Roth IRA"]);
+  const chosen = await loadWidget(t.db, A, { type: "goals", config: { goalId: done.id } }, now);
+  expect((chosen!.data as { name: string }[]).map((g) => g.name)).toEqual(["Emergency fund"]);
 });

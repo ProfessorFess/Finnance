@@ -91,7 +91,8 @@ export const WIDGETS = {
     async load(db, userId, s, now) {
       const { goals } = await goalsOnce(db, userId, now);
       const one = goals.find((g) => g.id === s.goalId);
-      return one ? [one] : goals.slice(0, s.limit);
+      // Finished goals stay on the Goals page; Home shows what is still in progress.
+      return one ? [one] : goals.filter((g) => g.status !== "completed").slice(0, s.limit);
     },
   }),
   upcoming: def({

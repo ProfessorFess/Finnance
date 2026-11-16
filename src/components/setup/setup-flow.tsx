@@ -153,14 +153,14 @@ export function PlanStep({
   );
 }
 
-export function BillsStep({ bills, accounts, categories, buckets, today }: ItemProps & { bills: { id: string; name: string; detail: string }[]; today: string }) {
+export function BillsStep({ bills, accounts, categories, buckets }: ItemProps & { bills: { id: string; name: string; detail: string }[] }) {
   const router = useRouter();
   const [open, setOpen] = useState(false);
   const have = new Set(bills.map((b) => b.name.toLowerCase()));
   return (
     <>
-      <Hint>Pick the subscriptions you pay for. Prices are typical; change them to what you pay.</Hint>
-      <CommonSubscriptions today={today} exclude={have} onAdded={() => router.refresh()} />
+      <Hint>Pick the subscriptions you pay for and the day of the month each one bills. Prices are typical; change them to what you pay.</Hint>
+      <CommonSubscriptions exclude={have} onAdded={() => router.refresh()} />
       <Added items={bills} />
       <Button type="button" variant="outline" className="self-start" onClick={() => setOpen(true)}>
         <Plus /> Add another bill

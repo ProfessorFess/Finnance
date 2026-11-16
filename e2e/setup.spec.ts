@@ -28,6 +28,7 @@ test("walks a new user through setup", async ({ page, isMobile }) => {
 
   await expect(page.getByText("Step 5 of 6")).toBeVisible();
   await page.getByRole("checkbox", { name: "Netflix" }).check();
+  await page.getByLabel("Netflix billing day").fill("3");
   await page.getByRole("button", { name: "Add selected" }).click();
   await expect(page.getByText("Added 1 subscription")).toBeVisible();
   await page.getByRole("link", { name: "Next" }).click();

@@ -63,17 +63,19 @@ it("isolates users", async () => {
   expect(a.steps.find((s) => s.key === "start_date")!.done).toBe(false);
 });
 
-it("adds picked subscriptions as monthly items", async () => {
+it("adds picked subscriptions on the day they bill", async () => {
+  const now = new Date("2026-11-16T18:00:00Z");
   await addCommonSubscriptions(t.db, A, [
-    { name: "Netflix", cents: 1799, matchPattern: "Netflix", anchorDate: "2026-11-16" },
-    { name: "Spotify", cents: 1199, matchPattern: "Spotify", anchorDate: "2026-11-16" },
-  ]);
+    { name: "Netflix", cents: 1799, matchPattern: "Netflix", day: 3 },
+    { name: "Spotify", cents: 1199, matchPattern: "Spotify", day: 31 },
+  ], now);
   const rules = await listRecurringRules(t.db, A);
   expect(rules.map((r) => [r.name, r.kind, r.frequency, r.expectedCents, r.anchorDate, r.active])).toEqual([
-    ["Netflix", "subscription", "monthly", 1799, "2026-11-16", true],
-    ["Spotify", "subscription", "monthly", 1199, "2026-11-16", true],
+    ["Netflix", "subscription", "monthly", 1799, "2026-11-03", true],
+    ["Spotify", "subscription", "monthly", 1199, "2026-11-30", true],
   ]);
   expect((await getSetupStatus(t.db, A)).steps.find((s) => s.key === "bills")!.done).toBe(true);
-  await expect(addCommonSubscriptions(t.db, A, [{ name: "Hulu", cents: 0, matchPattern: "Hulu", anchorDate: "2026-11-16" }])).rejects.toThrow();
+  await expect(addCommonSubscriptions(t.db, A, [{ name: "Hulu", cents: 999, matchPattern: "Hulu", day: 0 }], now)).rejects.toThrow("Enter the day Hulu bills");
+  await expect(addCommonSubscriptions(t.db, A, [{ name: "Hulu", cents: 0, matchPattern: "Hulu", day: 5 }], now)).rejects.toThrow();
   expect(await listRecurringRules(t.db, B)).toEqual([]);
 });

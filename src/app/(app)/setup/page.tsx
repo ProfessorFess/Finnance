@@ -81,7 +81,6 @@ async function StepBody({ db, userId, step }: { db: Database; userId: string; st
           accounts={accountOptions}
           categories={dialogCategories}
           buckets={{ options, defaultId }}
-          today={today}
         />
       );
     }
