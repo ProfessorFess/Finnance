@@ -88,3 +88,12 @@ export function monthWindow(today: string): { start: string; end: string } {
   const [y, m] = today.split("-").map(Number) as [number, number];
   return { start: `${pad(y, 4)}-${pad(m)}-01`, end: `${pad(y, 4)}-${pad(m)}-${pad(daysInMonth(y, m))}` };
 }
+
+/** A calendar date n months later (or earlier), with the day clamped to that month's length. */
+export function addMonths(iso: string, n: number): string {
+  const [y, m, d] = iso.split("-").map(Number) as [number, number, number];
+  const index = y * 12 + (m - 1) + n;
+  const year = Math.floor(index / 12);
+  const month = (index % 12) + 1;
+  return `${pad(year, 4)}-${pad(month)}-${pad(Math.min(d, daysInMonth(year, month)))}`;
+}

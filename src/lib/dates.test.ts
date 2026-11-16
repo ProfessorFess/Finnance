@@ -1,5 +1,5 @@
 import { afterEach, describe, expect, it } from "vitest";
-import { addDays, dayOfWeek, daysBetween, formatDisplayDate, lastDayOfMonth, monthWindow, parseDateValue, todayInTimeZone, weekWindow } from "./dates";
+import { addDays, addMonths, dayOfWeek, daysBetween, formatDisplayDate, lastDayOfMonth, monthWindow, parseDateValue, todayInTimeZone, weekWindow } from "./dates";
 
 const originalTz = process.env.TZ;
 afterEach(() => {
@@ -53,4 +53,11 @@ it("finds the day of the week, the week, and the month around a date", () => {
   expect(weekWindow("2026-11-16", 1)).toEqual({ start: "2026-11-16", end: "2026-11-22" });
   expect(weekWindow("2026-11-18", 0)).toEqual({ start: "2026-11-15", end: "2026-11-21" });
   expect(monthWindow("2028-02-10")).toEqual({ start: "2028-02-01", end: "2028-02-29" });
+});
+
+it("adds months with the day clamped to the month", () => {
+  expect(addMonths("2026-01-31", 1)).toBe("2026-02-28");
+  expect(addMonths("2026-11-30", 9)).toBe("2027-08-30");
+  expect(addMonths("2027-02-28", -1)).toBe("2027-01-28");
+  expect(addMonths("2026-12-15", 2)).toBe("2027-02-15");
 });

@@ -43,6 +43,13 @@
       "when": 1794810720089,
       "tag": "0005_furry_morgan_stark",
       "breakpoints": true
+    },
+    {
+      "idx": 6,
+      "version": "7",
+      "when": 1794813628459,
+      "tag": "0006_slippery_tigra",
+      "breakpoints": true
     }
   ]
 }

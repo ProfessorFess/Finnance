@@ -36,6 +36,11 @@ export type PlanTemplate = "paycheck_plan" | "monthly_categories" | "fifty_thirt
 /** "Split each income as it arrives" or "budget each month". */
 export type PlanCadence = "per_income" | "monthly";
 export type PlanRuleType = "extra_income";
+export type GoalType = "savings" | "debt_payoff" | "purchase" | "retirement";
+export type GoalStatus = "active" | "paused" | "completed" | "archived";
+/** manual = added by hand; auto = credited from a matching transaction; linked = the user tied a transaction to the goal. */
+export type ContributionSource = "manual" | "auto" | "linked";
+export type PlannedPer = "month" | "income";
 
 export { NOT_A_TRANSFER } from "@/lib/transfer-constants";
 
@@ -367,4 +372,52 @@ export const planRules = pgTable(
     ...timestamps,
   },
   (t) => [uniqueIndex("plan_rules_plan_type_idx").on(t.planId, t.type)],
+);
+
+export const goals = pgTable(
+  "goals",
+  {
+    id: id(),
+    userId: userId(),
+    name: text("name").notNull(),
+    type: text("type").$type<GoalType>().notNull(),
+    icon: text("icon").notNull(),
+    targetCents: cents("target_cents"),
+    targetDate: date("target_date", { mode: "string" }),
+    /** What was already saved toward it on start_date. */
+    startingCents: cents("starting_cents").default(0).notNull(),
+    priority: integer("priority").notNull(),
+    plannedCents: cents("planned_cents"),
+    plannedPer: text("planned_per").$type<PlannedPer>(),
+    status: text("status").$type<GoalStatus>().default("active").notNull(),
+    fundedByBucketId: text("funded_by_bucket_id").references(() => buckets.id, { onDelete: "set null" }),
+    /** Counts transfers into this account automatically. */
+    trackAccountId: text("track_account_id").references(() => accounts.id, { onDelete: "set null" }),
+    /** Or counts spending in this category automatically. */
+    trackCategoryId: text("track_category_id").references(() => categories.id, { onDelete: "set null" }),
+    startDate: date("start_date", { mode: "string" }).notNull(),
+    completedAt: timestamp("completed_at"),
+    ...timestamps,
+  },
+  (t) => [index("goals_user_idx").on(t.userId)],
+);
+
+export const goalContributions = pgTable(
+  "goal_contributions",
+  {
+    id: id(),
+    userId: userId(),
+    goalId: text("goal_id")
+      .notNull()
+      .references(() => goals.id, { onDelete: "cascade" }),
+    date: date("date", { mode: "string" }).notNull(),
+    amountCents: cents("amount_cents").notNull(),
+    transactionId: text("transaction_id").references(() => transactions.id, { onDelete: "cascade" }),
+    source: text("source").$type<ContributionSource>().notNull(),
+    /** The user said it doesn't count; kept so automation never adds it back. */
+    excluded: boolean("excluded").default(false).notNull(),
+    note: text("note"),
+    createdAt: timestamp("created_at").defaultNow().notNull(),
+  },
+  (t) => [index("goal_contributions_goal_idx").on(t.goalId), uniqueIndex("goal_contributions_transaction_idx").on(t.transactionId)],
 );
