@@ -1,5 +1,5 @@
-import { afterEach, expect, it } from "vitest";
-import { formatDisplayDate, parseDateValue } from "./dates";
+import { afterEach, describe, expect, it } from "vitest";
+import { addDays, daysBetween, formatDisplayDate, lastDayOfMonth, parseDateValue, todayInTimeZone } from "./dates";
 
 const originalTz = process.env.TZ;
 afterEach(() => {
@@ -21,4 +21,27 @@ it("parses calendar dates without timezone shifts", () => {
     expect(parseDateValue("11/14/2026", "MM/DD/YYYY")).toBe("2026-11-14");
     expect(formatDisplayDate("2026-11-14")).toBe("Nov 14, 2026");
   }
+});
+
+describe("calendar math", () => {
+  it("adds days across month, year, and leap boundaries", () => {
+    expect(addDays("2026-02-27", 2)).toBe("2026-03-01");
+    expect(addDays("2028-02-28", 1)).toBe("2028-02-29");
+    expect(addDays("2026-12-31", 1)).toBe("2027-01-01");
+    expect(addDays("2026-11-14", -14)).toBe("2026-10-31");
+  });
+  it("counts days between dates", () => {
+    expect(daysBetween("2026-11-14", "2026-11-28")).toBe(14);
+    expect(daysBetween("2026-11-28", "2026-11-14")).toBe(-14);
+  });
+  it("knows the last day of each month", () => {
+    expect(lastDayOfMonth(2026, 2)).toBe(28);
+    expect(lastDayOfMonth(2028, 2)).toBe(29);
+    expect(lastDayOfMonth(2026, 4)).toBe(30);
+  });
+  it("uses the user's timezone near midnight UTC", () => {
+    const now = new Date("2026-11-16T03:30:00Z");
+    expect(todayInTimeZone("America/Chicago", now)).toBe("2026-11-15");
+    expect(todayInTimeZone("UTC", now)).toBe("2026-11-16");
+  });
 });

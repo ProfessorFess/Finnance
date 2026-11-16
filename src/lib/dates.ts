@@ -37,3 +37,36 @@ export function formatDisplayDate(iso: string): string {
   const [y, m, d] = iso.split("-").map(Number);
   return `${MONTHS[m! - 1]} ${d}, ${y}`;
 }
+
+/** Days in a month (month 1–12). */
+export function lastDayOfMonth(year: number, month: number): number {
+  return daysInMonth(year, month);
+}
+
+const DAY_MS = 86_400_000;
+
+/** "YYYY-MM-DD" → days since 1970-01-01, computed in UTC so local time never shifts it. */
+function toDayNumber(iso: string): number {
+  const [y, m, d] = iso.split("-").map(Number);
+  return Math.round(Date.UTC(y!, m! - 1, d!) / DAY_MS);
+}
+
+function fromDayNumber(n: number): string {
+  const d = new Date(n * DAY_MS);
+  return `${pad(d.getUTCFullYear(), 4)}-${pad(d.getUTCMonth() + 1)}-${pad(d.getUTCDate())}`;
+}
+
+/** Calendar date plus n days (n may be negative). */
+export function addDays(iso: string, n: number): string {
+  return fromDayNumber(toDayNumber(iso) + n);
+}
+
+/** Whole days from `from` to `to` (negative when `to` is earlier). */
+export function daysBetween(from: string, to: string): number {
+  return toDayNumber(to) - toDayNumber(from);
+}
+
+/** Today's calendar date in the given IANA timezone, e.g. "America/Chicago". */
+export function todayInTimeZone(timeZone: string, now: Date = new Date()): string {
+  return new Intl.DateTimeFormat("en-CA", { timeZone, year: "numeric", month: "2-digit", day: "2-digit" }).format(now);
+}

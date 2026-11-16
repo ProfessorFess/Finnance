@@ -11,7 +11,7 @@ export type RuleView = {
   matchType: "merchant_equals" | "description_contains" | "regex";
   pattern: string;
   categoryName: string;
-  createdFrom: "user" | "correction" | "default";
+  createdFrom: "user" | "correction" | "default" | "recurring";
 };
 
 const MATCH_LABEL: Record<RuleView["matchType"], string> = {
@@ -38,6 +38,7 @@ export function RuleList({ title, rules, empty }: { title: string; rules: RuleVi
                 <ArrowRight className="size-3.5 shrink-0 text-muted-foreground" />
                 <span className="rounded-full bg-secondary px-2.5 py-0.5 text-xs">{r.categoryName}</span>
                 {r.createdFrom === "correction" && <span className="text-xs text-muted-foreground">Learned</span>}
+                {r.createdFrom === "recurring" && <span className="text-xs text-muted-foreground">From Recurring</span>}
               </div>
               <Button
                 variant="ghost"

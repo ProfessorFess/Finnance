@@ -19,7 +19,12 @@ export type CategoryKind = "expense" | "income" | "transfer";
 export type TransactionSource = "csv" | "xlsx" | "ofx" | "manual" | "ai" | "sync";
 export type CategorizationSource = "rule" | "history" | "ai" | "user" | "transfer";
 export type RuleMatchType = "merchant_equals" | "description_contains" | "regex";
-export type RuleOrigin = "user" | "correction" | "default";
+export type RuleOrigin = "user" | "correction" | "default" | "recurring";
+export type IncomeType = "salary" | "hourly" | "freelance" | "benefits" | "side_income" | "other";
+export type AmountMode = "fixed" | "varies" | "estimated";
+export type RecurringKind = "bill" | "subscription" | "transfer";
+/** How a transaction got linked to a recurring item; "dismissed" = the user said it isn't one. */
+export type MatchSource = "auto" | "user" | "dismissed";
 
 export { NOT_A_TRANSFER } from "@/lib/transfer-constants";
 
