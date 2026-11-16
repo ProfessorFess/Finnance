@@ -67,3 +67,23 @@ it("isolates users", async () => {
   await createGoal(t.db, A, goal());
   expect((await getGoalsOverview(t.db, B, now)).goals).toEqual([]);
 });
+
+it("names the funding bucket even when the goal has its own plan", async () => {
+  await ownerPlan(t.db, A, checking.id, allySav.id);
+  const savingsBucket = (await getActivePlan(t.db, A))!.buckets[0]!;
+  await createGoal(t.db, A, goal({ fundedByBucketId: savingsBucket.id, plannedCents: 30_000, plannedPer: "month" }));
+  const [view] = (await getGoalsOverview(t.db, A, now)).goals;
+  expect(view).toMatchObject({ fundedByBucketName: "Savings & investing", plannedBasis: "set" });
+});
+
+it("asks to mark a reached goal done even with nothing after it", async () => {
+  await createGoal(t.db, A, goal({ targetCents: 50_000, startingCents: 60_000 }));
+  const [view] = (await getGoalsOverview(t.db, A, now)).goals;
+  expect(view).toMatchObject({ askDone: true, rollOverTo: null });
+});
+
+it("leaves debt payoff out of the saved total", async () => {
+  await createGoal(t.db, A, goal({ startingCents: 10_000 }));
+  await createGoal(t.db, A, goal({ name: "Car loan", type: "debt_payoff", startingCents: 50_000 }));
+  expect((await getGoalsOverview(t.db, A, now)).totalSavedCents).toBe(10_000);
+});

@@ -33,6 +33,7 @@ function cardOf(g: GoalView): GoalCardView {
     projection: g.projection,
     trackLabel: g.trackLabel,
     rollOverTo: g.rollOverTo,
+    askDone: g.askDone,
     recent: g.recent.map((c) => ({ id: c.id, date: c.date, amountCents: c.amountCents, source: c.source, counted: c.counted, note: c.note })),
   };
 }

@@ -16,6 +16,8 @@ export type GoalView = Goal & {
   recent: (GoalContribution & { counted: boolean })[];
   /** When this goal is reached but still active: the next goal that would get its money. */
   rollOverTo: string | null;
+  /** Reached and still active: ask whether to mark it done. */
+  askDone: boolean;
 };
 
 export type GoalsOverview = { today: string; goals: GoalView[]; archived: GoalView[]; totalSavedCents: number };
@@ -45,7 +47,7 @@ export async function getGoalsOverview(db: Database, userId: string, now: Date =
   const categoryName = new Map(categoryRows.map((c) => [c.id, c.name]));
 
   // Planned amounts per income, or from a funding bucket, need the plan.
-  const needsPlan = list.some((g) => g.plannedPer === "income" || (g.plannedCents === null && g.fundedByBucketId));
+  const needsPlan = list.some((g) => g.plannedPer === "income" || g.fundedByBucketId);
   const plan = needsPlan ? await getPlanStatus(db, userId, now) : null;
   const bucketById = new Map((plan?.buckets ?? []).map((b) => [b.id, b]));
 
@@ -82,12 +84,14 @@ export async function getGoalsOverview(db: Database, userId: string, now: Date =
       fundedByBucketName: g.fundedByBucketId ? (bucketById.get(g.fundedByBucketId)?.name ?? null) : null,
       recent: mine.slice(0, 10),
       rollOverTo: null,
+      askDone: false,
     };
   });
 
   // A reached, still-active goal asks before its money rolls to the next goal with the same source.
   for (const v of views) {
     if (!v.projection.reached || v.status !== "active") continue;
+    v.askDone = true;
     const next = views.find((o) => o.id !== v.id && o.status === "active" && o.priority > v.priority && sameSource(o, v));
     v.rollOverTo = next?.name ?? null;
   }
@@ -97,6 +101,6 @@ export async function getGoalsOverview(db: Database, userId: string, now: Date =
     today,
     goals: shown,
     archived: views.filter((v) => v.status === "archived"),
-    totalSavedCents: views.filter((v) => v.status === "active" || v.status === "completed").reduce((s, v) => s + v.projection.progressCents, 0),
+    totalSavedCents: views.filter((v) => (v.status === "active" || v.status === "completed") && v.type !== "debt_payoff").reduce((s, v) => s + v.projection.progressCents, 0),
   };
 }

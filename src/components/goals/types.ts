@@ -20,6 +20,7 @@ export type GoalCardView = {
   projection: Projection;
   trackLabel: string | null;
   rollOverTo: string | null;
+  askDone: boolean;
   recent: { id: string; date: string; amountCents: number; source: "manual" | "auto" | "linked"; counted: boolean; note: string | null }[];
 };
 

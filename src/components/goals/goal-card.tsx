@@ -106,9 +106,11 @@ export function GoalCard({
         {goal.trackLabel && <p className="text-xs">Counts {goal.trackLabel.charAt(0).toLowerCase() + goal.trackLabel.slice(1)}</p>}
       </div>
 
-      {goal.rollOverTo && (
+      {goal.askDone && (
         <div className="flex flex-wrap items-center gap-2 rounded-xl bg-primary/5 px-3 py-2 text-sm">
-          <span className="flex-1">Reached! Mark it done so what comes next goes to {goal.rollOverTo}.</span>
+          <span className="flex-1">
+            {goal.rollOverTo ? `Reached! Mark it done so what comes next goes to ${goal.rollOverTo}.` : "Reached! Mark it done."}
+          </span>
           <Button
             type="button"
             size="sm"
