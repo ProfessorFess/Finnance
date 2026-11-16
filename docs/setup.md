@@ -148,3 +148,15 @@ A plan splits the money you receive into buckets and shows what's left in each, 
 5. When a paycheck arrives, **Plan** shows it with your moves ("Move $400 to Ally Savings"). Each one ticks off by itself once the transfer shows up.
 
 ✅ **Weekly spending** shows what's left this week, and the check reads **Fully allocated**.
+
+## 14. Add your goals
+
+Goals track themselves from the money you actually move.
+
+1. Open **Goals → Add goal**.
+2. For your emergency fund: enter the target (or leave it blank for now), what's **already saved** and **as of** which date, and choose **Funded by: Savings & investing**. That makes it count **moves into Ally Savings** automatically.
+3. Add your Roth IRA next, with **Counts automatically: Spending in Investing** (or use **Add money** whenever you contribute).
+4. Goals are in priority order; use the arrows to change it. When a goal is reached, its card asks you to **Mark done**, and what you move next counts toward the following goal.
+5. Any transaction can count toward a goal: open it in **Transactions** and choose **Counts toward**.
+
+✅ Each goal shows its progress and when you'll get there, "your plan" until 3 months of real contributions exist, then "your recent pace".
