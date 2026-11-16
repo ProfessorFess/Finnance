@@ -8,6 +8,7 @@ import { normalizeMerchant } from "@/server/categorize/normalize-merchant";
 import type { AiCategorizer } from "@/server/categorize/ai-categorizer";
 import { categorizeTransactions } from "@/server/categorize/pipeline";
 import { clearDanglingPairs, detectTransfers } from "@/server/categorize/transfers-service";
+import { matchRecurring } from "@/server/recurring/matching-service";
 import { assignOccurrences, dedupeHash } from "./dedupe";
 import { headerSignature } from "./detect";
 import { ImportError } from "./errors";
@@ -37,6 +38,8 @@ export type ImportResult = {
   errors: RowError[];
   /** Transfer pairs matched after this import. */
   transfers: number;
+  /** Rows linked to a paycheck, bill, or subscription. */
+  matched: number;
   /** Imported rows that still need the user's review. */
   needsReview: number;
 };
@@ -264,6 +267,7 @@ export async function commitImport(
 
   const { insertedIds, ...result } = committed;
   let transfers = 0;
+  let matched = 0;
   if (insertedIds.length > 0) {
     // Sorting runs after the rows are safely committed; a failure here never undoes the import.
     const dates = rows.map((r) => r.date).sort();
@@ -280,6 +284,10 @@ export async function commitImport(
         .update(transactions)
         .set({ needsReview: true })
         .where(and(eq(transactions.userId, userId), inArray(transactions.id, insertedIds), isNull(transactions.categorizationSource)));
+    }    try {
+      matched = await matchRecurring(db, userId, { from: dates[0]!, to: dates[dates.length - 1]! });
+    } catch (err) {
+      console.error("Recurring matching failed", err instanceof Error ? err.message : err);
     }
   }
   const needsReview = insertedIds.length
@@ -290,7 +298,7 @@ export async function commitImport(
           .where(and(eq(transactions.userId, userId), inArray(transactions.id, insertedIds), eq(transactions.needsReview, true)))
       ).length
     : 0;
-  return { ...result, transfers, needsReview };
+  return { ...result, transfers, needsReview, matched };
 }
 
 /** Removes everything one import added. */

@@ -9,6 +9,7 @@ import { normalizeMerchant } from "./normalize-merchant";
 import { matchRule } from "./rules";
 import { loadRules } from "./rules-service";
 import { detectTransfers } from "./transfers-service";
+import { matchRecurring } from "@/server/recurring/matching-service";
 
 export const AI_CONFIDENCE_THRESHOLD = 0.7;
 export const AI_BATCH_SIZE = 50;
@@ -218,7 +219,7 @@ export async function sortTransactions(
   db: Database,
   userId: string,
   deps: CategorizeDeps,
-): Promise<CategorizeSummary & { transfers: number; merchantsFilled: number }> {
+): Promise<CategorizeSummary & { transfers: number; merchantsFilled: number; matched: number }> {
   const missing = await db
     .select({ id: transactions.id, description: transactions.rawDescription })
     .from(transactions)
@@ -235,7 +236,8 @@ export async function sortTransactions(
   }
   const transfers = await detectTransfers(db, userId);
   const summary = await categorizeTransactions(db, userId, { pending: true }, deps);
-  return { ...summary, transfers, merchantsFilled: missing.length };
+  const matched = await matchRecurring(db, userId);
+  return { ...summary, transfers, merchantsFilled: missing.length, matched };
 }
 
 /** Rows Finnance has never tried to sort (imported before automatic sorting existed). */

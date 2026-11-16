@@ -14,6 +14,7 @@ import {
 import type { Database, Executor } from "@/server/db/types";
 import { logActivity } from "@/server/finance/activity";
 import { NotFoundError, ValidationError } from "@/server/finance/errors";
+import { rematchItem } from "./matching-service";
 import type { Frequency, ScheduledFrequency } from "./schedule";
 
 export type ItemRef = { kind: "income"; id: string } | { kind: "recurring"; id: string };
@@ -149,8 +150,8 @@ async function ruleFromItem(db: Database, userId: string, pattern: string, categ
 }
 
 async function saved(db: Database, userId: string, ref: ItemRef, pattern: string, categoryId: string | null): Promise<void> {
-  void ref;
   await ruleFromItem(db, userId, pattern, categoryId);
+  await rematchItem(db, userId, ref);
 }
 
 /** Unlinks every row from an item (before it is deleted). */

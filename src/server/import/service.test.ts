@@ -43,7 +43,7 @@ it("previews counts and suggests the account", async () => {
 
 it("skips pending rows and rows before the start date, and reports how many", async () => {
   const r = await commitImport(t.db, A, { file: ufcu(), accountId: checking.id });
-  expect(r).toMatchObject({ imported: 5, duplicates: 0, pending: 1, beforeStart: 1, errors: [] });
+  expect(r).toMatchObject({ imported: 5, duplicates: 0, pending: 1, beforeStart: 1, errors: [], matched: 0 });
   const acc = (await listAccounts(t.db, A)).find((a) => a.id === checking.id);
   expect(acc!.balanceCents).toBe(100_000 - 2_164 + 120_000 - 625 - 625 - 10_000);
 });
