@@ -22,6 +22,7 @@ export const PLAN_EDIT_USER = { name: "E2E Plan Edit", email: "plan-edit@e2e.tes
 export const PLAN_TWO_USER = { name: "E2E Plan Two", email: "plan-two@e2e.test", password: "e2e-plan-two-pw-12345" };
 export const GOALS_USER = { name: "E2E Goals", email: "goals@e2e.test", password: "e2e-goals-password-12" };
 export const GOALS_ORDER_USER = { name: "E2E Goals Order", email: "goals-order@e2e.test", password: "e2e-goals-order-pw-12" };
+export const GOALS_LINK_USER = { name: "E2E Goals Link", email: "goals-link@e2e.test", password: "e2e-goals-link-pw-123" };
 export const OWNER_STATE = "e2e/.auth/owner.json";
 
 const octet = () => Math.floor(Math.random() * 254) + 1;

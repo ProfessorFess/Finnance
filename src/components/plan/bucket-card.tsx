@@ -66,6 +66,7 @@ export function BucketCard({ bucket, cadence, children }: { bucket: BucketView; 
         {bucket.fundingType === "remainder" || bucket.fundingType === "sum_of_recurring" ? ` (≈ ${formatCents(bucket.typicalFundedCents ?? bucket.draft.fundingCents ?? bucket.fundedCents)})` : ""}{" "}
         {cadence === "monthly" ? "each month" : "from each income"}
         {bucket.destinationAccountName ? ` · moves to ${bucket.destinationAccountName}` : ""}
+        {bucket.fundsGoals.length ? ` · funds ${bucket.fundsGoals.join(", ")}` : ""}
       </p>
     </li>
   );

@@ -6,6 +6,8 @@ import {
   activityLog,
   type CategorizationSource,
   categories,
+  goalContributions,
+  goals,
   incomeSources,
   recurringRules,
   type TransactionSource,
@@ -56,6 +58,8 @@ export type TransactionRow = {
   transferPairId: string | null;
   /** The paycheck, bill, or subscription this row fulfils, if any. */
   match: TransactionMatch | null;
+  /** The goal this row counts toward (counted false = the user said it doesn't count). */
+  goal: { id: string; name: string; counted: boolean } | null;
 };
 
 export type TransactionMatch = { kind: "income" | "recurring"; id: string; name: string; expectedDate: string | null; source: "auto" | "user" };
@@ -98,6 +102,9 @@ const rowSelect = {
   matchSource: transactions.matchSource,
   incomeName: incomeSources.name,
   ruleName: recurringRules.name,
+  goalId: goals.id,
+  goalName: goals.name,
+  goalExcluded: goalContributions.excluded,
   // Exact text from Postgres (microseconds, no timezone conversion) for the cursor;
   // a JS Date would round to milliseconds and drift with the server's timezone.
   createdAt: sql<string>`${transactions.createdAt}::text`,
@@ -111,6 +118,8 @@ async function getRow(db: Executor, userId: string, id: string) {
     .leftJoin(categories, eq(categories.id, transactions.categoryId))
     .leftJoin(incomeSources, eq(incomeSources.id, transactions.incomeSourceId))
     .leftJoin(recurringRules, eq(recurringRules.id, transactions.recurringRuleId))
+    .leftJoin(goalContributions, eq(goalContributions.transactionId, transactions.id))
+    .leftJoin(goals, eq(goals.id, goalContributions.goalId))
     .where(and(eq(transactions.id, id), eq(transactions.userId, userId)));
   if (!row) throw new NotFoundError("Transaction");
   return row;
@@ -118,7 +127,7 @@ async function getRow(db: Executor, userId: string, id: string) {
 
 /** Drops the cursor-only `createdAt` field. */
 function toRow(r: Awaited<ReturnType<typeof getRow>>): TransactionRow {
-  const { createdAt, incomeSourceId, recurringRuleId, expectedDate, matchSource, incomeName, ruleName, ...row } = r;
+  const { createdAt, incomeSourceId, recurringRuleId, expectedDate, matchSource, incomeName, ruleName, goalId, goalName, goalExcluded, ...row } = r;
   void createdAt;
   const source = matchSource === "auto" || matchSource === "user" ? matchSource : null;
   const match: TransactionMatch | null =
@@ -127,7 +136,8 @@ function toRow(r: Awaited<ReturnType<typeof getRow>>): TransactionRow {
       : source && recurringRuleId && ruleName
         ? { kind: "recurring", id: recurringRuleId, name: ruleName, expectedDate, source }
         : null;
-  return { ...row, hidden: row.status === HIDDEN_STATUS, match };
+  const goal = goalId && goalName ? { id: goalId, name: goalName, counted: !goalExcluded && row.status !== HIDDEN_STATUS } : null;
+  return { ...row, hidden: row.status === HIDDEN_STATUS, match, goal };
 }
 
 /** One transaction as the list shows it. */
@@ -189,6 +199,8 @@ export async function listTransactions(
     .leftJoin(categories, eq(categories.id, transactions.categoryId))
     .leftJoin(incomeSources, eq(incomeSources.id, transactions.incomeSourceId))
     .leftJoin(recurringRules, eq(recurringRules.id, transactions.recurringRuleId))
+    .leftJoin(goalContributions, eq(goalContributions.transactionId, transactions.id))
+    .leftJoin(goals, eq(goals.id, goalContributions.goalId))
     .where(and(...where))
     .orderBy(desc(transactions.date), desc(transactions.createdAt), desc(transactions.id))
     .limit(limit + 1);

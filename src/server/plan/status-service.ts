@@ -1,6 +1,6 @@
-import { and, eq, gte, inArray, lte, ne, sql } from "drizzle-orm";
+import { and, asc, eq, gte, inArray, lte, ne, sql } from "drizzle-orm";
 import { addDays, monthWindow, todayInTimeZone } from "@/lib/dates";
-import { accounts, incomeSources, NOT_A_TRANSFER, recurringRules, transactions } from "@/server/db/schema";
+import { accounts, goals, incomeSources, NOT_A_TRANSFER, recurringRules, transactions } from "@/server/db/schema";
 import type { BucketRole, FundingType, LimitPeriod, PlanCadence, PlanTemplate } from "@/server/db/finance-schema";
 import type { Database } from "@/server/db/types";
 import { getSettings } from "@/server/finance/settings";
@@ -43,6 +43,8 @@ export type BucketView = {
   activityCents: number;
   remainingCents: number | null;
   destinationAccountName: string | null;
+  /** Names of active goals this bucket funds. */
+  fundsGoals: string[];
   draft: BucketDraft;
 };
 
@@ -215,6 +217,13 @@ export async function getPlanStatus(db: Database, userId: string, now: Date = ne
   ).map(({ pairId, ...r }) => ({ ...r, isTransfer: pairId !== null && pairId !== NOT_A_TRANSFER }));
 
   const accountRows = await db.select({ id: accounts.id, name: accounts.name }).from(accounts).where(eq(accounts.userId, userId));
+  const fundedGoals = bucketIds.length
+    ? await db
+        .select({ name: goals.name, bucketId: goals.fundedByBucketId })
+        .from(goals)
+        .where(and(eq(goals.userId, userId), eq(goals.status, "active"), inArray(goals.fundedByBucketId, bucketIds)))
+        .orderBy(asc(goals.priority))
+    : [];
   const accountName = new Map(accountRows.map((a) => [a.id, a.name]));
 
   // Buckets moving to the same account share its transfers instead of each counting all of them.
@@ -258,6 +267,7 @@ export async function getPlanStatus(db: Database, userId: string, now: Date = ne
       activityCents,
       remainingCents: limitCents === null ? null : limitCents - activityCents,
       destinationAccountName: b.destinationAccountId ? (accountName.get(b.destinationAccountId) ?? null) : null,
+      fundsGoals: fundedGoals.filter((g) => g.bucketId === b.id).map((g) => g.name),
       draft: bucketDraftOf(b),
     };
   });

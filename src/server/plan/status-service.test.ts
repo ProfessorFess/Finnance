@@ -126,3 +126,16 @@ it("a monthly plan with no expected amount doesn't claim it's over", async () =>
   const a = (await getPlanStatus(t.db, A, new Date("2026-11-10T18:00:00Z")))!;
   expect(a.health).toBeNull();
 });
+
+it("shows which goals a bucket funds", async () => {
+  const { createGoal } = await import("@/server/goals/goals-service");
+  const { getActivePlan } = await import("./plans-service");
+  const savingsBucket = (await getActivePlan(t.db, A))!.buckets[0]!;
+  await createGoal(t.db, A, {
+    name: "Emergency fund", type: "savings", targetCents: null, targetDate: null, startingCents: 0, plannedCents: null, plannedPer: null,
+    fundedByBucketId: savingsBucket.id, trackAccountId: null, trackCategoryId: null,
+  });
+  const s = (await getPlanStatus(t.db, A, now))!;
+  expect(byName(s.buckets, "Savings & investing").fundsGoals).toEqual(["Emergency fund"]);
+  expect(byName(s.buckets, "Bills").fundsGoals).toEqual([]);
+});

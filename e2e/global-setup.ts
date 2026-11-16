@@ -12,6 +12,7 @@ import { createIncomeSource, createRecurringRule } from "../src/server/recurring
 import { listCategories } from "../src/server/finance/categories";
 import { createPlan } from "../src/server/plan/plans-service";
 import { templateDrafts } from "../src/server/plan/templates";
+import { createGoal } from "../src/server/goals/goals-service";
 import * as schema from "../src/server/db/schema";
 import { assertSafeE2EDatabase } from "../src/test/e2e-db-guard";
 import { insertTestTransaction } from "../src/test/users";
@@ -24,6 +25,7 @@ import {
   OWNER,
   REVIEW_USER,
   REVIEW_USER_M,
+  GOALS_LINK_USER,
   GOALS_ORDER_USER,
   GOALS_USER,
   PLAN_EDIT_USER,
@@ -142,6 +144,11 @@ export default async function globalSetup() {
   const goalsUser = await seeded(GOALS_USER, [CHECKING]);
   await createAccount(db, goalsUser.id, { name: "Ally Savings", type: "savings", institution: "Ally", startingBalanceCents: 0 });
   await seeded(GOALS_ORDER_USER, [CHECKING]);
+  const linkUser = await seeded(GOALS_LINK_USER, [CHECKING]);
+  await createGoal(db, linkUser.id, {
+    name: "Gift fund", type: "savings", targetCents: null, targetDate: null, startingCents: 0, plannedCents: null, plannedPer: null,
+    fundedByBucketId: null, trackAccountId: null, trackCategoryId: null,
+  });
 
   // Rows as Phase 1a left them: never sorted (no source, no merchant, not flagged for review).
   const sortUser = await createOwner(auth, SORT_USER);

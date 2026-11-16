@@ -10,7 +10,7 @@ import { getDb } from "@/server/db/client";
 import { NotFoundError, ValidationError } from "@/server/finance/errors";
 import type { ItemRef } from "@/server/recurring/items-service";
 import { linkTransaction } from "@/server/recurring/matching-service";
-import { creditGoals } from "@/server/goals/credit-service";
+import { creditGoals, linkTransactionToGoal } from "@/server/goals/credit-service";
 import {
   createManualTransaction,
   deleteTransaction,
@@ -227,6 +227,20 @@ export async function refreshRow(transactionId: string): Promise<{ row: Transact
   const user = await requireUser();
   try {
     return { row: await getTransactionRow(getDb(), user.id, z.string().min(1).parse(transactionId)) };
+  } catch (err) {
+    return toFailure(err);
+  }
+}
+
+/** Counts a transaction toward a goal, or says it doesn't count toward any (goalId null). */
+export async function linkGoalAction(transactionId: string, goalId: string | null): Promise<{ row: TransactionRow } | Failure> {
+  const user = await requireUser();
+  try {
+    const id = z.string().min(1).parse(transactionId);
+    await linkTransactionToGoal(getDb(), user.id, id, z.string().min(1).nullable().parse(goalId));
+    revalidatePath("/transactions");
+    revalidatePath("/goals");
+    return { row: await getTransactionRow(getDb(), user.id, id) };
   } catch (err) {
     return toFailure(err);
   }

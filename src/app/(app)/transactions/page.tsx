@@ -10,6 +10,7 @@ import { getSettings } from "@/server/finance/settings";
 import { countNeedsReview, listTransactions, type TransactionFilters } from "@/server/finance/transactions";
 import { billBucketOptions, defaultBillBucketId } from "@/server/plan/plans-service";
 import { listMatchOptions } from "@/server/recurring/matching-service";
+import { listGoals } from "@/server/goals/goals-service";
 
 export const metadata = { title: "Transactions · Finnance" };
 
@@ -37,7 +38,7 @@ export default async function TransactionsPage({ searchParams }: PageProps<"/tra
   };
 
   const db = getDb();
-  const [page, accounts, categories, settings, reviewCount, matchOptions, bucketOptions, defaultBucketId] = await Promise.all([
+  const [page, accounts, categories, settings, reviewCount, matchOptions, bucketOptions, defaultBucketId, goalRows] = await Promise.all([
     listTransactions(db, user.id, filters),
     listAccounts(db, user.id),
     listCategories(db, user.id),
@@ -46,6 +47,7 @@ export default async function TransactionsPage({ searchParams }: PageProps<"/tra
     listMatchOptions(db, user.id),
     billBucketOptions(db, user.id),
     defaultBillBucketId(db, user.id),
+    listGoals(db, user.id),
   ]);
   const accountOptions = accounts.map((a) => ({ id: a.id, name: a.name }));
   const categoryOptions = categories.map((c) => ({ id: c.id, name: c.name, groupName: c.groupName }));
@@ -77,6 +79,7 @@ export default async function TransactionsPage({ searchParams }: PageProps<"/tra
         timezone={settings.timezone}
         matchOptions={matchOptions}
         buckets={{ options: bucketOptions, defaultId: defaultBucketId }}
+        goals={goalRows.filter((g) => g.status === "active" || g.status === "paused").map((g) => ({ id: g.id, name: g.name }))}
       />
     </div>
   );

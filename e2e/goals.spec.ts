@@ -1,5 +1,5 @@
 import { expect, test } from "@playwright/test";
-import { GOALS_ORDER_USER, GOALS_USER, signIn } from "./fixtures";
+import { GOALS_LINK_USER, GOALS_ORDER_USER, GOALS_USER, signIn } from "./fixtures";
 
 test("adds a goal and money by hand", async ({ page, isMobile }) => {
   test.skip(isMobile, "stateful flow runs on desktop");
@@ -36,4 +36,15 @@ test("orders goals", async ({ page, isMobile }) => {
   }
   await page.getByRole("button", { name: "Move Second up" }).click();
   await expect(page.getByRole("list", { name: "Goals" }).getByRole("heading").first()).toHaveText("Second");
+});
+
+test("counts a transaction toward a goal", async ({ page, isMobile }) => {
+  test.skip(isMobile, "stateful flow runs on desktop");
+  await page.goto("/sign-in?next=/transactions");
+  await signIn(page, GOALS_LINK_USER);
+  await page.getByRole("listitem").filter({ hasText: "Bennu Coffee" }).first().getByRole("button", { name: "Details" }).click();
+  await page.getByRole("dialog").getByLabel("Counts toward").selectOption({ label: "Gift fund" });
+  await expect(page.getByRole("dialog").getByLabel("Counts toward")).toHaveValue(/.+/);
+  await page.goto("/goals");
+  await expect(page.getByRole("listitem").filter({ hasText: "Gift fund" }).getByText("$6.25")).toBeVisible();
 });

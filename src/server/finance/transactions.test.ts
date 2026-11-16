@@ -175,3 +175,16 @@ it("shows which recurring item a row fulfils", async () => {
   await linkTransaction(t.db, A, payroll.id, null);
   expect((await listTransactions(t.db, A, {})).items.find((r) => r.id === payroll.id)!.match).toBeNull();
 });
+
+it("shows the goal a transaction counts toward", async () => {
+  const { createGoal } = await import("@/server/goals/goals-service");
+  const { linkTransactionToGoal } = await import("@/server/goals/credit-service");
+  const g = await createGoal(t.db, A, {
+    name: "Gift fund", type: "savings", targetCents: null, targetDate: null, startingCents: 0, plannedCents: null, plannedPer: null,
+    fundedByBucketId: null, trackAccountId: null, trackCategoryId: null,
+  });
+  const row = (await listTransactions(t.db, A, {})).items.find((r) => r.description === "Bennu Coffee")!;
+  expect(row.goal).toBeNull();
+  await linkTransactionToGoal(t.db, A, row.id, g.id);
+  expect((await listTransactions(t.db, A, {})).items.find((r) => r.id === row.id)!.goal).toEqual({ id: g.id, name: "Gift fund", counted: true });
+});

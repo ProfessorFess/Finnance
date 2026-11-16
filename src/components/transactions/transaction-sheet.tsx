@@ -12,7 +12,7 @@ import { formatCents } from "@/lib/money";
 import { cn } from "@/lib/utils";
 import type { TransactionRow } from "@/server/finance/transactions";
 import { type CategoryOption, CategorySelect } from "./category-select";
-import { linkRecurringAction, refreshRow } from "@/app/(app)/transactions/actions";
+import { linkGoalAction, linkRecurringAction, refreshRow } from "@/app/(app)/transactions/actions";
 import { ItemDialog } from "@/components/recurring/item-dialog";
 import type { MatchOption } from "@/server/recurring/matching-service";
 
@@ -49,6 +49,7 @@ export function TransactionSheet({
   accounts,
   matchOptions,
   buckets,
+  goals,
   onClose,
   onChange,
   onCategory,
@@ -60,6 +61,7 @@ export function TransactionSheet({
   accounts: { id: string; name: string }[];
   matchOptions: MatchOption[];
   buckets: { options: { id: string; name: string }[]; defaultId: string | null };
+  goals: { id: string; name: string }[];
   onClose: () => void;
   onChange: (row: TransactionRow) => void;
   onCategory: (row: TransactionRow, categoryId: string | null) => void;
@@ -122,6 +124,7 @@ export function TransactionSheet({
                 <span className="text-xs text-muted-foreground">{provenance(row)}</span>
               </div>
               <RecurringBlock row={row} accounts={accounts} categories={categories} matchOptions={matchOptions} buckets={buckets} onChange={onChange} />
+              {goals.length > 0 && <GoalBlock row={row} goals={goals} onChange={onChange} />}
               <div className="flex flex-col gap-1.5">
                 <Label htmlFor="tx-notes">Notes</Label>
                 <textarea
@@ -296,6 +299,38 @@ function RecurringBlock({
           })
         }
       />
+    </div>
+  );
+}
+
+/** Count this transaction toward a goal, or say it doesn't count. */
+function GoalBlock({ row, goals, onChange }: { row: TransactionRow; goals: { id: string; name: string }[]; onChange: (row: TransactionRow) => void }) {
+  const [pending, startTransition] = useTransition();
+  const value = row.goal?.counted ? row.goal.id : "";
+  return (
+    <div className="flex flex-col gap-1.5">
+      <Label htmlFor="tx-goal">Counts toward</Label>
+      <select
+        id="tx-goal"
+        value={value}
+        disabled={pending}
+        onChange={(e) =>
+          startTransition(async () => {
+            const res = await linkGoalAction(row.id, e.target.value || null);
+            if ("error" in res) toast.error(res.error);
+            else onChange(res.row);
+          })
+        }
+        className="h-8 rounded-lg border border-input bg-transparent px-2 text-sm"
+      >
+        <option value="">No goal</option>
+        {goals.map((g) => (
+          <option key={g.id} value={g.id}>
+            {g.name}
+          </option>
+        ))}
+      </select>
+      {row.goal && !row.goal.counted && <span className="text-xs text-muted-foreground">Doesn&apos;t count toward {row.goal.name}</span>}
     </div>
   );
 }
