@@ -14,6 +14,7 @@ import {
 import type { Database, Executor } from "@/server/db/types";
 import { logActivity } from "@/server/finance/activity";
 import { NotFoundError, ValidationError } from "@/server/finance/errors";
+import { assertBucket, defaultBillBucketId } from "@/server/plan/plans-service";
 import { rematchItem } from "./matching-service";
 import type { Frequency, ScheduledFrequency } from "./schedule";
 
@@ -50,6 +51,8 @@ export type RecurringRuleInput = {
   categoryId: string | null;
   matchPattern: string;
   active?: boolean;
+  /** The budget bucket it's paid from. Omitted: the plan's bills bucket on create, unchanged on update. */
+  bucketId?: string | null;
 };
 
 function checkName(name: string): string {
@@ -219,8 +222,18 @@ export async function deleteIncomeSource(db: Database, userId: string, id: strin
   });
 }
 
+/** Which bucket pays a bill: as given (checked), or the plan's default for new bills and subscriptions. */
+async function bucketFor(db: Database, userId: string, input: RecurringRuleInput, current: string | null | undefined): Promise<string | null> {
+  if (input.bucketId === undefined) {
+    if (current !== undefined) return current;
+    return input.kind === "transfer" ? null : defaultBillBucketId(db, userId);
+  }
+  if (input.bucketId) await assertBucket(db, userId, input.bucketId);
+  return input.bucketId;
+}
+
 export async function createRecurringRule(db: Database, userId: string, input: RecurringRuleInput): Promise<RecurringRule> {
-  const values = await cleanRule(db, userId, input);
+  const values = { ...(await cleanRule(db, userId, input)), bucketId: await bucketFor(db, userId, input, undefined) };
   const row = await db.transaction(async (tx) => {
     const [created] = await tx.insert(recurringRules).values({ userId, ...values }).returning();
     await logActivity(tx, { userId, actor: "user", action: "recurring_rule.create", entityType: "recurring_rule", entityId: created!.id, after: created });
@@ -232,7 +245,7 @@ export async function createRecurringRule(db: Database, userId: string, input: R
 
 export async function updateRecurringRule(db: Database, userId: string, id: string, input: RecurringRuleInput): Promise<RecurringRule> {
   const before = await getRule(db, userId, id);
-  const values = await cleanRule(db, userId, input);
+  const values = { ...(await cleanRule(db, userId, input)), bucketId: await bucketFor(db, userId, input, before.bucketId) };
   const row = await db.transaction(async (tx) => {
     const [updated] = await tx
       .update(recurringRules)
