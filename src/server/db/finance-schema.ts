@@ -70,6 +70,8 @@ export const userSettings = pgTable("user_settings", {
   weekStartDay: integer("week_start_day").default(1).notNull(),
   aiMonthlyCapCents: integer("ai_monthly_cap_cents").default(1000).notNull(),
   defaultRulesSeeded: boolean("default_rules_seeded").default(false).notNull(),
+  /** First-run setup steps the user chose to skip. */
+  setupSkipped: text("setup_skipped").array().default(sql`'{}'::text[]`).notNull(),
   ...timestamps,
 });
 
@@ -420,4 +422,38 @@ export const goalContributions = pgTable(
     createdAt: timestamp("created_at").defaultNow().notNull(),
   },
   (t) => [index("goal_contributions_goal_idx").on(t.goalId), uniqueIndex("goal_contributions_transaction_idx").on(t.transactionId)],
+);
+
+export type WidgetSize = "sm" | "md" | "lg" | "full";
+
+/** A saved Home (or other) dashboard; its starting layout follows the plan until the user customizes it. */
+export const dashboards = pgTable(
+  "dashboards",
+  {
+    id: id(),
+    userId: userId(),
+    name: text("name").default("Home").notNull(),
+    isDefault: boolean("is_default").default(true).notNull(),
+    layoutKey: text("layout_key").notNull(),
+    customized: boolean("customized").default(false).notNull(),
+    ...timestamps,
+  },
+  (t) => [uniqueIndex("dashboards_one_default_idx").on(t.userId).where(sql`${t.isDefault}`)],
+);
+
+export const dashboardWidgets = pgTable(
+  "dashboard_widgets",
+  {
+    id: id(),
+    userId: userId(),
+    dashboardId: text("dashboard_id")
+      .notNull()
+      .references(() => dashboards.id, { onDelete: "cascade" }),
+    type: text("type").notNull(),
+    config: jsonb("config").$type<Record<string, unknown>>().default({}).notNull(),
+    size: text("size").$type<WidgetSize>().notNull(),
+    position: integer("position").notNull(),
+    ...timestamps,
+  },
+  (t) => [index("dashboard_widgets_dashboard_idx").on(t.dashboardId, t.position)],
 );

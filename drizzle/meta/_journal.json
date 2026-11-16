@@ -50,6 +50,13 @@
       "when": 1794813628459,
       "tag": "0006_slippery_tigra",
       "breakpoints": true
+    },
+    {
+      "idx": 7,
+      "version": "7",
+      "when": 1794850370785,
+      "tag": "0007_soft_joshua_kane",
+      "breakpoints": true
     }
   ]
 }
