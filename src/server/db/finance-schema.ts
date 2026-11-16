@@ -7,12 +7,14 @@ import {
   integer,
   jsonb,
   pgTable,
+  primaryKey,
   real,
   text,
   timestamp,
   uniqueIndex,
 } from "drizzle-orm/pg-core";
 import type { Frequency, ScheduledFrequency } from "@/server/recurring/schedule";
+import { sql } from "drizzle-orm";
 import { user } from "./auth-schema";
 
 export type AccountType = "checking" | "savings" | "credit_card" | "cash" | "loan" | "investment" | "other";
@@ -26,6 +28,14 @@ export type AmountMode = "fixed" | "varies" | "estimated";
 export type RecurringKind = "bill" | "subscription" | "transfer";
 /** How a transaction got linked to a recurring item; "dismissed" = the user said it isn't one. */
 export type MatchSource = "auto" | "user" | "dismissed";
+export type BucketRole = "spending" | "bills" | "savings" | "goal" | "buffer";
+export type FundingType = "fixed" | "percent" | "sum_of_recurring" | "remainder";
+/** A limit's window: a calendar week, a calendar month, or the time since the latest income. */
+export type LimitPeriod = "weekly" | "monthly" | "per_income";
+export type PlanTemplate = "paycheck_plan" | "monthly_categories" | "fifty_thirty_twenty" | "custom";
+/** "Split each income as it arrives" or "budget each month". */
+export type PlanCadence = "per_income" | "monthly";
+export type PlanRuleType = "extra_income";
 
 export { NOT_A_TRANSFER } from "@/lib/transfer-constants";
 
@@ -265,6 +275,8 @@ export const recurringRules = pgTable(
     categoryId: text("category_id").references(() => categories.id, { onDelete: "set null" }),
     matchPattern: text("match_pattern").notNull(),
     active: boolean("active").default(true).notNull(),
+    /** The budget bucket this bill is paid from. */
+    bucketId: text("bucket_id").references((): AnyPgColumn => buckets.id, { onDelete: "set null" }),
     ...timestamps,
   },
   (t) => [index("recurring_rules_user_idx").on(t.userId)],
@@ -280,4 +292,79 @@ export const recurringDismissals = pgTable(
     createdAt: timestamp("created_at").defaultNow().notNull(),
   },
   (t) => [uniqueIndex("recurring_dismissals_user_key_idx").on(t.userId, t.merchantKey)],
+);
+
+export const budgetPlans = pgTable(
+  "budget_plans",
+  {
+    id: id(),
+    userId: userId(),
+    name: text("name").notNull(),
+    template: text("template").$type<PlanTemplate>().notNull(),
+    cadence: text("cadence").$type<PlanCadence>().notNull(),
+    active: boolean("active").default(true).notNull(),
+    ...timestamps,
+  },
+  (t) => [uniqueIndex("budget_plans_one_active_idx").on(t.userId).where(sql`${t.active}`)],
+);
+
+/** Which income sources fund a plan (any number, scheduled or not). */
+export const planIncomeSources = pgTable(
+  "plan_income_sources",
+  {
+    planId: text("plan_id")
+      .notNull()
+      .references(() => budgetPlans.id, { onDelete: "cascade" }),
+    incomeSourceId: text("income_source_id")
+      .notNull()
+      .references(() => incomeSources.id, { onDelete: "cascade" }),
+    userId: userId(),
+    createdAt: timestamp("created_at").defaultNow().notNull(),
+  },
+  (t) => [primaryKey({ columns: [t.planId, t.incomeSourceId] })],
+);
+
+export const buckets = pgTable(
+  "buckets",
+  {
+    id: id(),
+    userId: userId(),
+    planId: text("plan_id")
+      .notNull()
+      .references(() => budgetPlans.id, { onDelete: "cascade" }),
+    name: text("name").notNull(),
+    icon: text("icon").notNull(),
+    color: text("color"),
+    sortOrder: integer("sort_order").default(0).notNull(),
+    role: text("role").$type<BucketRole>().notNull(),
+    fundingType: text("funding_type").$type<FundingType>().notNull(),
+    /** Per income (per month in monthly plans). */
+    fundingCents: cents("funding_cents"),
+    fundingBps: integer("funding_bps"),
+    limitCents: cents("limit_cents"),
+    limitPeriod: text("limit_period").$type<LimitPeriod>(),
+    trackCategoryIds: text("track_category_ids").array().default([]).notNull(),
+    destinationAccountId: text("destination_account_id").references(() => accounts.id, { onDelete: "set null" }),
+    ...timestamps,
+  },
+  (t) => [index("buckets_plan_idx").on(t.planId)],
+);
+
+export const planRules = pgTable(
+  "plan_rules",
+  {
+    id: id(),
+    userId: userId(),
+    planId: text("plan_id")
+      .notNull()
+      .references(() => budgetPlans.id, { onDelete: "cascade" }),
+    type: text("type").$type<PlanRuleType>().notNull(),
+    bucketId: text("bucket_id")
+      .notNull()
+      .references(() => buckets.id, { onDelete: "cascade" }),
+    incomeSourceId: text("income_source_id").references(() => incomeSources.id, { onDelete: "cascade" }),
+    percentBps: integer("percent_bps").default(10000).notNull(),
+    ...timestamps,
+  },
+  (t) => [uniqueIndex("plan_rules_plan_type_idx").on(t.planId, t.type)],
 );

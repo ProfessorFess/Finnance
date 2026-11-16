@@ -70,3 +70,21 @@ export function daysBetween(from: string, to: string): number {
 export function todayInTimeZone(timeZone: string, now: Date = new Date()): string {
   return new Intl.DateTimeFormat("en-CA", { timeZone, year: "numeric", month: "2-digit", day: "2-digit" }).format(now);
 }
+
+/** 0 = Sunday … 6 = Saturday. 1970-01-01 was a Thursday. */
+export function dayOfWeek(iso: string): number {
+  return (((toDayNumber(iso) + 4) % 7) + 7) % 7;
+}
+
+/** The 7-day week containing `today`, starting on `weekStartDay` (0 = Sunday). */
+export function weekWindow(today: string, weekStartDay: number): { start: string; end: string } {
+  const back = (dayOfWeek(today) - weekStartDay + 7) % 7;
+  const start = addDays(today, -back);
+  return { start, end: addDays(start, 6) };
+}
+
+/** The calendar month containing `today`. */
+export function monthWindow(today: string): { start: string; end: string } {
+  const [y, m] = today.split("-").map(Number) as [number, number];
+  return { start: `${pad(y, 4)}-${pad(m)}-01`, end: `${pad(y, 4)}-${pad(m)}-${pad(daysInMonth(y, m))}` };
+}

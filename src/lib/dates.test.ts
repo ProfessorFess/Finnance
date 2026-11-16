@@ -1,5 +1,5 @@
 import { afterEach, describe, expect, it } from "vitest";
-import { addDays, daysBetween, formatDisplayDate, lastDayOfMonth, parseDateValue, todayInTimeZone } from "./dates";
+import { addDays, dayOfWeek, daysBetween, formatDisplayDate, lastDayOfMonth, monthWindow, parseDateValue, todayInTimeZone, weekWindow } from "./dates";
 
 const originalTz = process.env.TZ;
 afterEach(() => {
@@ -44,4 +44,13 @@ describe("calendar math", () => {
     expect(todayInTimeZone("America/Chicago", now)).toBe("2026-11-15");
     expect(todayInTimeZone("UTC", now)).toBe("2026-11-16");
   });
+});
+
+it("finds the day of the week, the week, and the month around a date", () => {
+  expect(dayOfWeek("2026-01-01")).toBe(4);
+  expect(dayOfWeek("2026-11-18")).toBe(3);
+  expect(weekWindow("2026-11-18", 1)).toEqual({ start: "2026-11-16", end: "2026-11-22" });
+  expect(weekWindow("2026-11-16", 1)).toEqual({ start: "2026-11-16", end: "2026-11-22" });
+  expect(weekWindow("2026-11-18", 0)).toEqual({ start: "2026-11-15", end: "2026-11-21" });
+  expect(monthWindow("2028-02-10")).toEqual({ start: "2028-02-01", end: "2028-02-29" });
 });
