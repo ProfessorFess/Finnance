@@ -1,7 +1,16 @@
 import { randomUUID } from "node:crypto";
 import { and, desc, eq, gte, ilike, inArray, isNull, lte, ne, or, type SQL, sql } from "drizzle-orm";
 import { formatDisplayDate, parseDateValue } from "@/lib/dates";
-import { accounts, activityLog, type CategorizationSource, categories, type TransactionSource, transactions } from "@/server/db/schema";
+import {
+  accounts,
+  activityLog,
+  type CategorizationSource,
+  categories,
+  incomeSources,
+  recurringRules,
+  type TransactionSource,
+  transactions,
+} from "@/server/db/schema";
 import type { Database, Executor } from "@/server/db/types";
 import { type ActivityEntry, listActivity, logActivity } from "./activity";
 import { NotFoundError, ValidationError } from "./errors";
@@ -45,7 +54,11 @@ export type TransactionRow = {
   categorizationConfidence: number | null;
   needsReview: boolean;
   transferPairId: string | null;
+  /** The paycheck, bill, or subscription this row fulfils, if any. */
+  match: TransactionMatch | null;
 };
+
+export type TransactionMatch = { kind: "income" | "recurring"; id: string; name: string; expectedDate: string | null; source: "auto" | "user" };
 
 type Cursor = { date: string; createdAt: string; id: string };
 
@@ -79,6 +92,12 @@ const rowSelect = {
   categorizationConfidence: transactions.categorizationConfidence,
   needsReview: transactions.needsReview,
   transferPairId: transactions.transferPairId,
+  incomeSourceId: transactions.incomeSourceId,
+  recurringRuleId: transactions.recurringRuleId,
+  expectedDate: transactions.expectedDate,
+  matchSource: transactions.matchSource,
+  incomeName: incomeSources.name,
+  ruleName: recurringRules.name,
   // Exact text from Postgres (microseconds, no timezone conversion) for the cursor;
   // a JS Date would round to milliseconds and drift with the server's timezone.
   createdAt: sql<string>`${transactions.createdAt}::text`,
@@ -90,6 +109,8 @@ async function getRow(db: Executor, userId: string, id: string) {
     .from(transactions)
     .innerJoin(accounts, eq(accounts.id, transactions.accountId))
     .leftJoin(categories, eq(categories.id, transactions.categoryId))
+    .leftJoin(incomeSources, eq(incomeSources.id, transactions.incomeSourceId))
+    .leftJoin(recurringRules, eq(recurringRules.id, transactions.recurringRuleId))
     .where(and(eq(transactions.id, id), eq(transactions.userId, userId)));
   if (!row) throw new NotFoundError("Transaction");
   return row;
@@ -97,9 +118,21 @@ async function getRow(db: Executor, userId: string, id: string) {
 
 /** Drops the cursor-only `createdAt` field. */
 function toRow(r: Awaited<ReturnType<typeof getRow>>): TransactionRow {
-  const { createdAt, ...row } = r;
+  const { createdAt, incomeSourceId, recurringRuleId, expectedDate, matchSource, incomeName, ruleName, ...row } = r;
   void createdAt;
-  return { ...row, hidden: row.status === HIDDEN_STATUS };
+  const source = matchSource === "auto" || matchSource === "user" ? matchSource : null;
+  const match: TransactionMatch | null =
+    source && incomeSourceId && incomeName
+      ? { kind: "income", id: incomeSourceId, name: incomeName, expectedDate, source }
+      : source && recurringRuleId && ruleName
+        ? { kind: "recurring", id: recurringRuleId, name: ruleName, expectedDate, source }
+        : null;
+  return { ...row, hidden: row.status === HIDDEN_STATUS, match };
+}
+
+/** One transaction as the list shows it. */
+export async function getTransactionRow(db: Database, userId: string, id: string): Promise<TransactionRow> {
+  return toRow(await getRow(db, userId, id));
 }
 
 async function assertCategory(db: Executor, userId: string, categoryId: string | null | undefined) {
@@ -154,6 +187,8 @@ export async function listTransactions(
     .from(transactions)
     .innerJoin(accounts, eq(accounts.id, transactions.accountId))
     .leftJoin(categories, eq(categories.id, transactions.categoryId))
+    .leftJoin(incomeSources, eq(incomeSources.id, transactions.incomeSourceId))
+    .leftJoin(recurringRules, eq(recurringRules.id, transactions.recurringRuleId))
     .where(and(...where))
     .orderBy(desc(transactions.date), desc(transactions.createdAt), desc(transactions.id))
     .limit(limit + 1);

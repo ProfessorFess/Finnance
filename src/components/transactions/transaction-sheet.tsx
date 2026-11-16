@@ -12,6 +12,9 @@ import { formatCents } from "@/lib/money";
 import { cn } from "@/lib/utils";
 import type { TransactionRow } from "@/server/finance/transactions";
 import { type CategoryOption, CategorySelect } from "./category-select";
+import { linkRecurringAction, refreshRow } from "@/app/(app)/transactions/actions";
+import { ItemDialog } from "@/components/recurring/item-dialog";
+import type { MatchOption } from "@/server/recurring/matching-service";
 
 const SOURCE_LABELS: Record<string, string> = {
   csv: "Imported from a CSV file",
@@ -43,6 +46,8 @@ function provenance(row: TransactionRow): string {
 export function TransactionSheet({
   row,
   categories,
+  accounts,
+  matchOptions,
   onClose,
   onChange,
   onCategory,
@@ -51,6 +56,8 @@ export function TransactionSheet({
 }: {
   row: TransactionRow | null;
   categories: CategoryOption[];
+  accounts: { id: string; name: string }[];
+  matchOptions: MatchOption[];
   onClose: () => void;
   onChange: (row: TransactionRow) => void;
   onCategory: (row: TransactionRow, categoryId: string | null) => void;
@@ -112,6 +119,7 @@ export function TransactionSheet({
                 )}
                 <span className="text-xs text-muted-foreground">{provenance(row)}</span>
               </div>
+              <RecurringBlock row={row} accounts={accounts} categories={categories} matchOptions={matchOptions} onChange={onChange} />
               <div className="flex flex-col gap-1.5">
                 <Label htmlFor="tx-notes">Notes</Label>
                 <textarea
@@ -189,5 +197,100 @@ export function TransactionSheet({
         )}
       </SheetContent>
     </Sheet>
+  );
+}
+
+/** Which paycheck or bill this row fulfils, with ways to fix it or start tracking it. */
+function RecurringBlock({
+  row,
+  accounts,
+  categories,
+  matchOptions,
+  onChange,
+}: {
+  row: TransactionRow;
+  accounts: { id: string; name: string }[];
+  categories: CategoryOption[];
+  matchOptions: MatchOption[];
+  onChange: (row: TransactionRow) => void;
+}) {
+  const [tracking, setTracking] = useState(false);
+  const [pending, startTransition] = useTransition();
+  const incoming = row.amountCents > 0;
+  const options = matchOptions.filter((o) => o.direction === (incoming ? "in" : "out"));
+
+  const link = (ref: MatchOption["ref"] | null) =>
+    startTransition(async () => {
+      const res = await linkRecurringAction(row.id, ref);
+      if ("error" in res) toast.error(res.error);
+      else onChange(res.row);
+    });
+
+  return (
+    <div className="flex flex-col gap-1.5">
+      <span className="text-xs font-medium text-muted-foreground">Recurring</span>
+      {row.match ? (
+        <div className="flex flex-wrap items-center gap-2">
+          <span className="text-sm">
+            {row.match.name}
+            {row.match.expectedDate ? ` · expected ${formatDisplayDate(row.match.expectedDate)}` : ""}
+          </span>
+          <Button variant="outline" size="sm" disabled={pending} onClick={() => link(null)}>
+            Not this one
+          </Button>
+        </div>
+      ) : (
+        <div className="flex flex-wrap items-center gap-2">
+          {options.length > 0 && (
+            <>
+              <label htmlFor="tx-part-of" className="sr-only">
+                Part of
+              </label>
+              <select
+                id="tx-part-of"
+                value=""
+                disabled={pending}
+                onChange={(e) => {
+                  const o = options.find((x) => `${x.ref.kind}:${x.ref.id}` === e.target.value);
+                  if (o) link(o.ref);
+                }}
+                className="h-8 rounded-lg border border-input bg-transparent px-2 text-sm"
+              >
+                <option value="">Part of…</option>
+                {options.map((o) => (
+                  <option key={`${o.ref.kind}:${o.ref.id}`} value={`${o.ref.kind}:${o.ref.id}`}>
+                    {o.name}
+                  </option>
+                ))}
+              </select>
+            </>
+          )}
+          <Button variant="outline" size="sm" onClick={() => setTracking(true)}>
+            Track as recurring
+          </Button>
+        </div>
+      )}
+      <ItemDialog
+        open={tracking}
+        onOpenChange={setTracking}
+        accounts={accounts}
+        categories={categories.map((c) => ({ id: c.id, name: c.name, groupName: c.groupName }))}
+        initial={{
+          kind: incoming ? "income" : "bill",
+          name: row.merchant ?? row.description,
+          matchPattern: row.merchant ?? row.description,
+          anchorDate: row.date,
+          amountCents: Math.abs(row.amountCents),
+          accountId: row.accountId,
+          categoryId: row.categoryId,
+        }}
+        onSaved={() =>
+          startTransition(async () => {
+            const res = await refreshRow(row.id);
+            if (!("error" in res)) onChange(res.row);
+          })
+        }
+      />
+    </div>
   );
 }

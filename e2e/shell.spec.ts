@@ -11,7 +11,6 @@ const placeholders: [string, string, RegExp][] = [
   ["/", "Home", /Phase 2a/],
   ["/plan", "Plan", /Phase 2a/],
   ["/goals", "Goals", /Phase 2a/],
-  ["/recurring", "Recurring", /Phase 1c/],
 ];
 
 test("desktop shows the sidebar and hides bottom tabs", async ({ page, isMobile }) => {

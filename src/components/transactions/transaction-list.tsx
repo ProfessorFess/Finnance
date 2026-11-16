@@ -1,6 +1,6 @@
 "use client";
 
-import { ArrowLeftRight, ListOrdered } from "lucide-react";
+import { ArrowLeftRight, ListOrdered, Repeat } from "lucide-react";
 import Link from "next/link";
 import { useRouter } from "next/navigation";
 import { useMemo, useState, useTransition } from "react";
@@ -15,6 +15,7 @@ import type { TransactionFilters, TransactionRow } from "@/server/finance/transa
 import { CategoryOptions, type CategoryOption, CategorySelect } from "./category-select";
 import { QuickAdd } from "./quick-add";
 import { TransactionSheet } from "./transaction-sheet";
+import type { MatchOption } from "@/server/recurring/matching-service";
 
 /** Both sides of a matched transfer carry the same pair id. */
 const isTransfer = (r: TransactionRow) => r.transferPairId !== null && r.transferPairId !== NOT_A_TRANSFER;
@@ -28,6 +29,7 @@ export function TransactionList({
   accounts,
   categories,
   timezone,
+  matchOptions,
 }: {
   initial: TransactionRow[];
   initialCursor: string | null;
@@ -36,6 +38,7 @@ export function TransactionList({
   accounts: { id: string; name: string }[];
   categories: CategoryOption[];
   timezone: string;
+  matchOptions: MatchOption[];
 }) {
   const [items, setItems] = useState(initial);
   const [cursor, setCursor] = useState(initialCursor);
@@ -216,8 +219,11 @@ export function TransactionList({
                     />
                     <div className="flex min-w-0 flex-1 flex-col gap-1 sm:flex-row sm:items-center sm:gap-3">
                       <div className="min-w-0 flex-1">
-                        <p className={cn("truncate text-sm font-medium", row.hidden && "text-muted-foreground line-through")}>
-                          {row.description}
+                        <p className={cn("flex items-center gap-1.5 truncate text-sm font-medium", row.hidden && "text-muted-foreground line-through")}>
+                          <span className="truncate">{row.description}</span>
+                          {row.match && (
+                            <Repeat role="img" aria-label={`Recurring: ${row.match.name}`} className="size-3.5 shrink-0 text-muted-foreground" />
+                          )}
                         </p>
                         <p className="truncate text-xs text-muted-foreground">
                           {row.accountName}
@@ -266,6 +272,8 @@ export function TransactionList({
       <TransactionSheet
         row={detail}
         categories={categories}
+        accounts={accounts}
+        matchOptions={matchOptions}
         onClose={() => setDetail(null)}
         onChange={replace}
         onCategory={changeCategory}

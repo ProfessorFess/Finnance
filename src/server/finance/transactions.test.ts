@@ -6,6 +6,8 @@ import { commitImport } from "@/server/import/service";
 import { createTestDb } from "@/test/db";
 import { fixtureBytes } from "@/test/fixtures";
 import { createTestUser } from "@/test/users";
+import { createIncomeSource } from "@/server/recurring/items-service";
+import { linkTransaction } from "@/server/recurring/matching-service";
 import { type Account, createAccount, listAccounts } from "./accounts";
 import { listCategories } from "./categories";
 import { NotFoundError } from "./errors";
@@ -159,4 +161,17 @@ it("isolates users", async () => {
   await expect(updateTransaction(t.db, A, row!.id, { categoryId: bCat.id })).rejects.toThrow(NotFoundError);
   expect(await setCategoryBulk(t.db, B, [row!.id], bCat.id)).toBe(0);
   await expect(createManualTransaction(t.db, B, { accountId: checking.id, date: "2026-11-14", description: "x", amountCents: -1 })).rejects.toThrow(NotFoundError);
+});
+
+it("shows which recurring item a row fulfils", async () => {
+  const pay = await createIncomeSource(t.db, A, {
+    name: "Paycheck", type: "hourly", frequency: "biweekly", anchorDate: "2026-11-14", secondDay: null, amountMode: "varies",
+    expectedCents: null, accountId: checking.id, categoryId: null, matchPattern: "Payroll Acme Corp",
+  });
+  const rows = (await listTransactions(t.db, A, {})).items;
+  const payroll = rows.find((r) => r.description === "Payroll Acme Corp")!;
+  expect(payroll.match).toEqual({ kind: "income", id: pay.id, name: "Paycheck", expectedDate: "2026-11-14", source: "auto" });
+  expect(rows.filter((r) => r.id !== payroll.id).every((r) => r.match === null)).toBe(true);
+  await linkTransaction(t.db, A, payroll.id, null);
+  expect((await listTransactions(t.db, A, {})).items.find((r) => r.id === payroll.id)!.match).toBeNull();
 });

@@ -1,5 +1,5 @@
 import { expect, test } from "@playwright/test";
-import { RECURRING_USER, signIn } from "./fixtures";
+import { RECURRING_TRACK_USER, RECURRING_USER, signIn } from "./fixtures";
 
 test("adds a bill and sees it matched", async ({ page, isMobile }) => {
   test.skip(isMobile, "stateful flow runs on desktop");
@@ -20,4 +20,34 @@ test("adds a bill and sees it matched", async ({ page, isMobile }) => {
   await expect(card.getByText("Last Nov 14, 2026")).toBeVisible();
   await expect(card.getByText("$21.64").first()).toBeVisible();
   await expect(card.getByText(/Late/)).toHaveCount(0);
+});
+
+test("tracks the paycheck from a transaction, then un-matches it", async ({ page, isMobile }) => {
+  test.skip(isMobile, "stateful flow runs on desktop");
+  await page.goto("/sign-in?next=/transactions");
+  await signIn(page, RECURRING_TRACK_USER);
+  const payroll = page.getByRole("listitem").filter({ hasText: "Payroll Acme Corp" });
+  await payroll.getByRole("button", { name: "Details" }).click();
+  const sheet = page.getByRole("dialog");
+  await sheet.getByRole("button", { name: "Track as recurring" }).click();
+  const dialog = page.getByRole("dialog").filter({ hasText: "Track something that repeats" });
+  await expect(dialog.getByLabel("Name")).toHaveValue("Payroll Acme Corp");
+  await expect(dialog.getByLabel("Type", { exact: true })).toHaveValue("income");
+  await expect(dialog.getByLabel("Amount", { exact: true })).toHaveValue("1200.00");
+  await dialog.getByLabel("How often").selectOption({ label: "Every 2 weeks" });
+  await dialog.getByRole("button", { name: "Save" }).click();
+  await expect(dialog).toBeHidden();
+  // The open sheet updates in place.
+  await expect(sheet.getByText("Payroll Acme Corp · expected Nov 14, 2026")).toBeVisible();
+  await sheet.getByRole("button", { name: "Close" }).click();
+  await expect(payroll.getByLabel("Recurring: Payroll Acme Corp")).toBeVisible();
+
+  await page.goto("/recurring");
+  const card = page.getByRole("listitem").filter({ hasText: "Payroll Acme Corp" });
+  await expect(card.getByText("Last Nov 14, 2026")).toBeVisible();
+
+  await page.goto("/transactions");
+  await payroll.getByRole("button", { name: "Details" }).click();
+  await page.getByRole("dialog").getByRole("button", { name: "Not this one" }).click();
+  await expect(page.getByRole("dialog").getByLabel("Part of")).toBeVisible();
 });

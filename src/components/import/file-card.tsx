@@ -34,6 +34,7 @@ export function resultLine(r: ImportResult): string {
   const parts = [`${r.imported} imported`];
   if (r.duplicates > 0) parts.push(`${r.duplicates} already here`);
   if (r.transfers > 0) parts.push(`${r.transfers} ${r.transfers === 1 ? "transfer" : "transfers"} matched`);
+  if (r.matched > 0) parts.push(`${r.matched} matched to recurring`);
   return parts.join(" · ");
 }
 

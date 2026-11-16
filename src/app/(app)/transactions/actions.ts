@@ -8,10 +8,13 @@ import { alwaysCategorize, chooseCategory, type Learned } from "@/server/categor
 import { unpairTransfer } from "@/server/categorize/transfers-service";
 import { getDb } from "@/server/db/client";
 import { NotFoundError, ValidationError } from "@/server/finance/errors";
+import type { ItemRef } from "@/server/recurring/items-service";
+import { linkTransaction } from "@/server/recurring/matching-service";
 import {
   createManualTransaction,
   deleteTransaction,
   getTransactionHistory,
+  getTransactionRow,
   listTransactions,
   setCategoryBulk,
   setHidden,
@@ -168,10 +171,14 @@ const LABELS: Record<string, string> = {
   "transaction.transfer_pair": "Matched as a transfer",
   "transaction.transfer_unpair": "Marked as not a transfer",
   "transaction.unhide": "Unhidden",
+  "transaction.auto_match": "Matched to a recurring item",
 };
 
 function labelFor(action: string, before: unknown, after: unknown): string {
   if (LABELS[action]) return LABELS[action];
+  if (action === "transaction.link_recurring") {
+    return (after as { matchSource?: string } | null)?.matchSource === "dismissed" ? "Marked as not recurring" : "Linked to a recurring item";
+  }
   if (action === "transaction.update") {
     const b = (before ?? {}) as Record<string, unknown>;
     const a = (after ?? {}) as Record<string, unknown>;
@@ -188,6 +195,32 @@ export async function getHistory(id: string): Promise<HistoryItem[] | Failure> {
     const entries = await getTransactionHistory(getDb(), user.id, z.string().parse(id));
     const items = entries.map((e) => ({ id: e.id, label: labelFor(e.action, e.before, e.after), at: e.createdAt.toISOString() }));
     return items;
+  } catch (err) {
+    return toFailure(err);
+  }
+}
+
+const refSchema = z.object({ kind: z.enum(["income", "recurring"]), id: z.string().min(1) }).nullable();
+
+/** Links a row to a paycheck or bill by hand, or says "Not this one" (ref null). */
+export async function linkRecurringAction(transactionId: string, ref: ItemRef | null): Promise<{ row: TransactionRow } | Failure> {
+  const user = await requireUser();
+  try {
+    const id = z.string().min(1).parse(transactionId);
+    await linkTransaction(getDb(), user.id, id, refSchema.parse(ref));
+    revalidatePath("/transactions");
+    revalidatePath("/recurring");
+    return { row: await getTransactionRow(getDb(), user.id, id) };
+  } catch (err) {
+    return toFailure(err);
+  }
+}
+
+/** The latest version of one row (after something else changed it). */
+export async function refreshRow(transactionId: string): Promise<{ row: TransactionRow } | Failure> {
+  const user = await requireUser();
+  try {
+    return { row: await getTransactionRow(getDb(), user.id, z.string().min(1).parse(transactionId)) };
   } catch (err) {
     return toFailure(err);
   }
