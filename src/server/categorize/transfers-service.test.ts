@@ -100,3 +100,23 @@ it("cleaning up a broken pair keeps a category the user chose", async () => {
   const [a] = await rows([out.id]);
   expect(a).toMatchObject({ transferPairId: null, categoryId: gifts.id, categorizationSource: "user" });
 });
+
+it("skips a pair whose side the user categorized meanwhile", async () => {
+  const { out, inn } = await zellePair();
+  // Another device: the user categorizes one side between the scan and the write.
+  const racing = new Proxy(t.db, {
+    get(target, prop, receiver) {
+      if (prop === "transaction") {
+        return async (fn: Parameters<typeof target.transaction>[0]) => {
+          await target.update(transactions).set({ categorizationSource: "user" }).where(eq(transactions.id, inn.id));
+          return target.transaction(fn);
+        };
+      }
+      return Reflect.get(target, prop, receiver);
+    },
+  });
+  expect(await detectTransfers(racing, A)).toBe(0);
+  const [a, b] = await rows([out.id, inn.id]);
+  expect(a!.transferPairId).toBeNull();
+  expect(b!.transferPairId).toBeNull();
+});

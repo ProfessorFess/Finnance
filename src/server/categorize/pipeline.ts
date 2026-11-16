@@ -160,20 +160,33 @@ export async function categorizeTransactions(
     const res = aiResults.get(r.id);
     if (res) {
       const sure = res.categoryId !== null && res.confidence >= AI_CONFIDENCE_THRESHOLD;
-      decisions.push({ id: r.id, categoryId: res.categoryId, source: "ai", confidence: res.confidence, needsReview: !sure, before: r.categoryId });
+      // An "unknown" answer keeps any earlier guess rather than erasing it.
+      decisions.push({ id: r.id, categoryId: res.categoryId ?? r.categoryId, source: "ai", confidence: res.confidence, needsReview: !sure, before: r.categoryId });
     } else {
       decisions.push({ id: r.id, categoryId: r.categoryId, source: null, confidence: null, needsReview: true, before: r.categoryId });
     }
   }
 
   await db.transaction(async (tx) => {
+    const written = new Set<string>();
     for (const d of decisions) {
-      await tx
+      // Re-check eligibility at write time: the user may have chosen a category
+      // (or a transfer may have been paired) while this run was working.
+      const updated = await tx
         .update(transactions)
         .set({ categoryId: d.categoryId, categorizationSource: d.source, categorizationConfidence: d.confidence, needsReview: d.needsReview })
-        .where(and(eq(transactions.id, d.id), eq(transactions.userId, userId)));
+        .where(
+          and(
+            eq(transactions.id, d.id),
+            eq(transactions.userId, userId),
+            sql`${transactions.categorizationSource} is distinct from 'user'`,
+            or(isNull(transactions.transferPairId), eq(transactions.transferPairId, NOT_A_TRANSFER)),
+          ),
+        )
+        .returning({ id: transactions.id });
+      if (updated.length) written.add(d.id);
     }
-    const changed = decisions.filter((d) => d.source !== null);
+    const changed = decisions.filter((d) => d.source !== null && written.has(d.id));
     if (changed.length) {
       await tx.insert(activityLog).values(
         changed.map((d) => ({

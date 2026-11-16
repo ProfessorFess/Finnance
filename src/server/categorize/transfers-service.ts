@@ -47,16 +47,35 @@ export async function detectTransfers(db: Database, userId: string, range?: { fr
 
   const categoryId = await transferCategoryId(db, userId);
   const before = new Map(rows.map((r) => [r.id, r.categoryId]));
-  await db.transaction(async (tx) => {
+  return db.transaction(async (tx) => {
+    const made: string[] = [];
     for (const [outId, inId] of pairs) {
+      // Re-check both sides at write time (locking them): skip the pair if either
+      // was categorized by the user or paired elsewhere since the scan.
+      const still = await tx
+        .select({ id: transactions.id })
+        .from(transactions)
+        .where(
+          and(
+            eq(transactions.userId, userId),
+            inArray(transactions.id, [outId, inId]),
+            ne(transactions.status, "excluded"),
+            isNull(transactions.transferPairId),
+            sql`${transactions.categorizationSource} is distinct from 'user'`,
+          ),
+        )
+        .for("update");
+      if (still.length !== 2) continue;
+      made.push(outId, inId);
       const pairId = randomUUID();
       await tx
         .update(transactions)
         .set({ transferPairId: pairId, categoryId, categorizationSource: "transfer", categorizationConfidence: null, needsReview: false })
         .where(and(eq(transactions.userId, userId), inArray(transactions.id, [outId, inId])));
     }
+    if (made.length === 0) return 0;
     await tx.insert(activityLog).values(
-      pairs.flat().map((id) => ({
+      made.map((id) => ({
         userId,
         actor: "system" as const,
         action: "transaction.transfer_pair",
@@ -66,8 +85,8 @@ export async function detectTransfers(db: Database, userId: string, range?: { fr
         after: { categoryId, source: "transfer" },
       })),
     );
+    return made.length / 2;
   });
-  return pairs.length;
 }
 
 /** "Not a transfer": un-links both sides and keeps them from pairing again. */

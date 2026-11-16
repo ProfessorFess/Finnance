@@ -1,8 +1,8 @@
-import { eq } from "drizzle-orm";
+import { and, eq } from "drizzle-orm";
 import { afterEach, beforeEach, expect, it } from "vitest";
 import type { AiUsageTokens } from "@/server/ai/config";
 import { recordAiUsage } from "@/server/ai/usage";
-import { aiUsage, transactions } from "@/server/db/schema";
+import { activityLog, aiUsage, transactions } from "@/server/db/schema";
 import { type Account, createAccount } from "@/server/finance/accounts";
 import { listCategories } from "@/server/finance/categories";
 import { setTrackingStartDate } from "@/server/finance/settings";
@@ -168,4 +168,26 @@ it("sorts a new cash entry when it's added", async () => {
   expect(await get(starbucks.id)).toMatchObject({ categoryId: (await cat("Coffee")).id, categorizationSource: "rule" });
   expect(await get(unknown.id)).toMatchObject({ needsReview: true });
   expect(await countUnsorted(t.db, A)).toBe(0);
+});
+
+it("does not overwrite a choice made while sorting was running", async () => {
+  const gifts = await cat("Gifts");
+  const row = await add("Haymaker");
+  const racing: AiCategorizer = async (input) => {
+    // Another device: the user picks a category while the AI call is in flight.
+    await t.db.update(transactions).set({ categoryId: gifts.id, categorizationSource: "user" }).where(eq(transactions.id, row.id));
+    return fakeAi({ Haymaker: ["Coffee", 0.9] })(input);
+  };
+  await categorizeTransactions(t.db, A, { pending: true }, { ai: racing, now });
+  expect(await get(row.id)).toMatchObject({ categoryId: gifts.id, categorizationSource: "user" });
+  const log = await t.db.select().from(activityLog).where(and(eq(activityLog.entityId, row.id), eq(activityLog.action, "transaction.auto_categorize")));
+  expect(log).toHaveLength(0);
+});
+
+it("an AI 'unknown' keeps the earlier guess", async () => {
+  const coffee = await cat("Coffee");
+  const row = await add("Mystery Shop");
+  await t.db.update(transactions).set({ categoryId: coffee.id }).where(eq(transactions.id, row.id));
+  await categorizeTransactions(t.db, A, { pending: true }, { ai: fakeAi({ "Mystery Shop": ["Nonexistent", 0.2] }), now });
+  expect(await get(row.id)).toMatchObject({ categoryId: coffee.id, needsReview: true, categorizationSource: "ai" });
 });
