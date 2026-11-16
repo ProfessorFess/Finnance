@@ -52,6 +52,7 @@ const itemForm = z.object({
   categoryId: optional,
   matchPattern: z.string().max(400),
   paused: z.string().optional(),
+  bucketId: z.string().optional(),
 });
 
 /** Adds or edits a paycheck, bill, subscription, or recurring transfer. */
@@ -100,6 +101,8 @@ export async function saveItem(formData: FormData): Promise<{ ref: ItemRef } | F
         categoryId: f.categoryId,
         matchPattern: f.matchPattern,
         active: f.paused !== "on",
+        // Present only when the user has a plan: "" means "Not in my plan".
+        ...(formData.has("bucketId") ? { bucketId: f.bucketId || null } : {}),
       };
       const row = f.id ? await updateRecurringRule(db, user.id, f.id, input) : await createRecurringRule(db, user.id, input);
       ref = { kind: "recurring", id: row.id };

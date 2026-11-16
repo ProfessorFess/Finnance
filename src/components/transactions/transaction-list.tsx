@@ -30,6 +30,7 @@ export function TransactionList({
   categories,
   timezone,
   matchOptions,
+  buckets,
 }: {
   initial: TransactionRow[];
   initialCursor: string | null;
@@ -39,6 +40,7 @@ export function TransactionList({
   categories: CategoryOption[];
   timezone: string;
   matchOptions: MatchOption[];
+  buckets: { options: { id: string; name: string }[]; defaultId: string | null };
 }) {
   const [items, setItems] = useState(initial);
   const [cursor, setCursor] = useState(initialCursor);
@@ -274,6 +276,7 @@ export function TransactionList({
         categories={categories}
         accounts={accounts}
         matchOptions={matchOptions}
+        buckets={buckets}
         onClose={() => setDetail(null)}
         onChange={replace}
         onCategory={changeCategory}

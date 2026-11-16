@@ -48,6 +48,7 @@ export function TransactionSheet({
   categories,
   accounts,
   matchOptions,
+  buckets,
   onClose,
   onChange,
   onCategory,
@@ -58,6 +59,7 @@ export function TransactionSheet({
   categories: CategoryOption[];
   accounts: { id: string; name: string }[];
   matchOptions: MatchOption[];
+  buckets: { options: { id: string; name: string }[]; defaultId: string | null };
   onClose: () => void;
   onChange: (row: TransactionRow) => void;
   onCategory: (row: TransactionRow, categoryId: string | null) => void;
@@ -119,7 +121,7 @@ export function TransactionSheet({
                 )}
                 <span className="text-xs text-muted-foreground">{provenance(row)}</span>
               </div>
-              <RecurringBlock row={row} accounts={accounts} categories={categories} matchOptions={matchOptions} onChange={onChange} />
+              <RecurringBlock row={row} accounts={accounts} categories={categories} matchOptions={matchOptions} buckets={buckets} onChange={onChange} />
               <div className="flex flex-col gap-1.5">
                 <Label htmlFor="tx-notes">Notes</Label>
                 <textarea
@@ -206,12 +208,14 @@ function RecurringBlock({
   accounts,
   categories,
   matchOptions,
+  buckets,
   onChange,
 }: {
   row: TransactionRow;
   accounts: { id: string; name: string }[];
   categories: CategoryOption[];
   matchOptions: MatchOption[];
+  buckets: { options: { id: string; name: string }[]; defaultId: string | null };
   onChange: (row: TransactionRow) => void;
 }) {
   const [tracking, setTracking] = useState(false);
@@ -284,6 +288,7 @@ function RecurringBlock({
           accountId: row.accountId,
           categoryId: row.categoryId,
         }}
+        buckets={buckets}
         onSaved={() =>
           startTransition(async () => {
             const res = await refreshRow(row.id);

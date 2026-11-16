@@ -8,6 +8,7 @@ import { listAccounts } from "@/server/finance/accounts";
 import { listCategories } from "@/server/finance/categories";
 import { getSettings } from "@/server/finance/settings";
 import { countNeedsReview, listTransactions, type TransactionFilters } from "@/server/finance/transactions";
+import { billBucketOptions, defaultBillBucketId } from "@/server/plan/plans-service";
 import { listMatchOptions } from "@/server/recurring/matching-service";
 
 export const metadata = { title: "Transactions · Finnance" };
@@ -36,13 +37,15 @@ export default async function TransactionsPage({ searchParams }: PageProps<"/tra
   };
 
   const db = getDb();
-  const [page, accounts, categories, settings, reviewCount, matchOptions] = await Promise.all([
+  const [page, accounts, categories, settings, reviewCount, matchOptions, bucketOptions, defaultBucketId] = await Promise.all([
     listTransactions(db, user.id, filters),
     listAccounts(db, user.id),
     listCategories(db, user.id),
     getSettings(db, user.id),
     countNeedsReview(db, user.id),
     listMatchOptions(db, user.id),
+    billBucketOptions(db, user.id),
+    defaultBillBucketId(db, user.id),
   ]);
   const accountOptions = accounts.map((a) => ({ id: a.id, name: a.name }));
   const categoryOptions = categories.map((c) => ({ id: c.id, name: c.name, groupName: c.groupName }));
@@ -73,6 +76,7 @@ export default async function TransactionsPage({ searchParams }: PageProps<"/tra
         categories={categoryOptions}
         timezone={settings.timezone}
         matchOptions={matchOptions}
+        buckets={{ options: bucketOptions, defaultId: defaultBucketId }}
       />
     </div>
   );

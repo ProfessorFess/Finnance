@@ -38,6 +38,7 @@ export type ItemDraft = Partial<{
   categoryId: string | null;
   matchPattern: string;
   active: boolean;
+  bucketId: string | null;
 }>;
 
 export type DialogOption = { id: string; name: string };
@@ -63,6 +64,7 @@ export function ItemDialog({
   initial,
   recent = [],
   onSaved,
+  buckets,
 }: {
   open: boolean;
   onOpenChange: (open: boolean) => void;
@@ -72,11 +74,13 @@ export function ItemDialog({
   /** Latest matched transactions, shown when editing. */
   recent?: { date: string; amountCents: number }[];
   onSaved?: () => void;
+  /** The plan's buckets a bill can be paid from, and the default for new bills. */
+  buckets?: { options: DialogOption[]; defaultId: string | null };
 }) {
   return (
     <Dialog open={open} onOpenChange={onOpenChange}>
       <DialogContent className="max-h-[90dvh] overflow-y-auto">
-        {open && <ItemForm accounts={accounts} categories={categories} initial={initial ?? {}} onDone={() => onOpenChange(false)} onSaved={onSaved} />}
+        {open && <ItemForm accounts={accounts} categories={categories} initial={initial ?? {}} onDone={() => onOpenChange(false)} onSaved={onSaved} buckets={buckets} />}
         {open && recent.length > 0 && (
           <section className="border-t pt-4">
             <h3 className="mb-2 text-sm font-medium">Recent</h3>
@@ -101,12 +105,14 @@ function ItemForm({
   initial,
   onDone,
   onSaved,
+  buckets,
 }: {
   accounts: DialogOption[];
   categories: DialogCategory[];
   initial: ItemDraft;
   onDone: () => void;
   onSaved?: () => void;
+  buckets?: { options: DialogOption[]; defaultId: string | null };
 }) {
   const editing = Boolean(initial.id);
   const categoryIdByName = (name: string | null) => (name ? (categories.find((c) => c.name === name)?.id ?? "") : "");
@@ -311,6 +317,25 @@ function ItemForm({
           </select>
         </div>
       </div>
+
+      {!income && buckets && buckets.options.length > 0 && (
+        <div className="flex flex-col gap-1.5">
+          <Label htmlFor="item-bucket">Paid from</Label>
+          <select
+            id="item-bucket"
+            name="bucketId"
+            defaultValue={editing ? (initial.bucketId ?? "") : (initial.bucketId ?? (kind === "transfer" ? "" : (buckets.defaultId ?? "")))}
+            className={selectClass}
+          >
+            {buckets.options.map((b) => (
+              <option key={b.id} value={b.id}>
+                {b.name}
+              </option>
+            ))}
+            <option value="">Not in my plan</option>
+          </select>
+        </div>
+      )}
 
       <div className="flex flex-col gap-1.5">
         <Label htmlFor="item-pattern">Match text</Label>

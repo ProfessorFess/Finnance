@@ -48,6 +48,7 @@ export function RecurringBoard({
   accounts,
   categories,
   today,
+  buckets,
 }: {
   income: ItemCardView[];
   bills: ItemCardView[];
@@ -57,6 +58,7 @@ export function RecurringBoard({
   accounts: DialogOption[];
   categories: DialogCategory[];
   today: string;
+  buckets: { options: DialogOption[]; defaultId: string | null };
 }) {
   const [dialog, setDialog] = useState<{ open: boolean; draft: ItemDraft; recent: ItemCardView["recent"] }>({ open: false, draft: {}, recent: [] });
   const open = (draft: ItemDraft, recent: ItemCardView["recent"] = []) => setDialog({ open: true, draft, recent });
@@ -92,6 +94,7 @@ export function RecurringBoard({
         categories={categories}
         initial={dialog.draft}
         recent={dialog.recent}
+        buckets={buckets}
       />
     </>
   );

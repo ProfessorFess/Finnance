@@ -10,6 +10,7 @@ import { getDb } from "@/server/db/client";
 import { listAccounts } from "@/server/finance/accounts";
 import { listCategories } from "@/server/finance/categories";
 import type { IncomeSource, RecurringRule } from "@/server/recurring/items-service";
+import { billBucketOptions, defaultBillBucketId } from "@/server/plan/plans-service";
 import { getRecurringOverview, type RecurringItemView } from "@/server/recurring/overview";
 import { listSuggestions, type SuggestionView } from "@/server/recurring/suggestions-service";
 
@@ -33,7 +34,7 @@ function draftOf(v: RecurringItemView): ItemDraft {
     return { ...base, kind: "income", amountMode: s.amountMode, incomeType: s.type };
   }
   const r = v.item as RecurringRule;
-  return { ...base, kind: r.kind, amountVaries: r.amountVaries };
+  return { ...base, kind: r.kind, amountVaries: r.amountVaries, bucketId: r.bucketId };
 }
 
 function cardOf(v: RecurringItemView): ItemCardView {
@@ -80,11 +81,13 @@ function suggestionOf(s: SuggestionView): SuggestionCardView {
 export default async function RecurringPage() {
   const user = await requireUser();
   const db = getDb();
-  const [overview, suggestions, accounts, categories] = await Promise.all([
+  const [overview, suggestions, accounts, categories, bucketOptions, defaultBucketId] = await Promise.all([
     getRecurringOverview(db, user.id),
     listSuggestions(db, user.id),
     listAccounts(db, user.id),
     listCategories(db, user.id),
+    billBucketOptions(db, user.id),
+    defaultBillBucketId(db, user.id),
   ]);
 
   return (
@@ -109,6 +112,7 @@ export default async function RecurringPage() {
           monthlyIncomeCents={overview.monthlyIncomeCents}
           monthlyBillsCents={overview.monthlyBillsCents}
           today={overview.today}
+          buckets={{ options: bucketOptions, defaultId: defaultBucketId }}
           accounts={accounts.map((a) => ({ id: a.id, name: a.name }))}
           categories={categories.map((c) => ({ id: c.id, name: c.name, groupName: c.groupName }))}
         />

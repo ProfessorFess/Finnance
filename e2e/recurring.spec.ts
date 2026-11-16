@@ -1,5 +1,5 @@
 import { expect, test } from "@playwright/test";
-import { RECURRING_LOG_USER, RECURRING_TRACK_USER, RECURRING_USER, signIn } from "./fixtures";
+import { PLAN_EDIT_USER, RECURRING_LOG_USER, RECURRING_TRACK_USER, RECURRING_USER, signIn } from "./fixtures";
 
 test("adds a bill and sees it matched", async ({ page, isMobile }) => {
   test.skip(isMobile, "stateful flow runs on desktop");
@@ -90,4 +90,23 @@ test("logs income by hand", async ({ page, isMobile }) => {
   const card = page.getByRole("listitem").filter({ hasText: "Tips" });
   await expect(card.getByText("Last Nov 12, 2026")).toBeVisible();
   await expect(card.getByText("$85.00").first()).toBeVisible();
+});
+
+test("chooses which bucket pays a bill", async ({ page, isMobile }) => {
+  test.skip(isMobile, "stateful flow runs on desktop");
+  await page.goto("/sign-in?next=/recurring");
+  await signIn(page, PLAN_EDIT_USER);
+  await page.getByRole("button", { name: "Add", exact: true }).click();
+  const dialog = page.getByRole("dialog");
+  await dialog.getByLabel("Type", { exact: true }).selectOption({ label: "Subscription" });
+  await dialog.getByLabel("Name").fill("Spotify");
+  await dialog.getByLabel("First date").fill("2026-11-14");
+  await dialog.getByLabel("Amount", { exact: true }).fill("11.99");
+  await dialog.getByLabel("Match text").fill("Spotify");
+  await expect(dialog.getByLabel("Paid from")).toHaveValue(/.+/);
+  await dialog.getByLabel("Paid from").selectOption({ label: "Weekly spending" });
+  await dialog.getByRole("button", { name: "Save" }).click();
+  await expect(dialog).toBeHidden();
+  await page.getByRole("listitem").filter({ hasText: "Spotify" }).getByRole("button").first().click();
+  await expect(page.getByRole("dialog").getByLabel("Paid from").locator("option:checked")).toHaveText("Weekly spending");
 });
