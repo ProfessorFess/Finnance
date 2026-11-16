@@ -5,9 +5,7 @@ import type { Database } from "@/server/db/types";
 import { countUnsorted } from "@/server/categorize/pipeline";
 import { getSettings } from "@/server/finance/settings";
 import { countNeedsReview, HIDDEN_STATUS } from "@/server/finance/transactions";
-import { getGoalsOverview } from "@/server/goals/overview";
-import { getPlanStatus } from "@/server/plan/status-service";
-import { getRecurringOverview } from "@/server/recurring/overview";
+import { goalsOnce, planStatusOnce, recurringOnce } from "./cached";
 import { listSuggestions } from "@/server/recurring/suggestions-service";
 
 export type SpendingRow = { categoryId: string | null; name: string; cents: number };
@@ -64,7 +62,7 @@ export async function getSpendingByCategory(db: Database, userId: string, now: D
 
 /** Active income and bills expected in the next `days` days, soonest first. */
 export async function getUpcoming(db: Database, userId: string, now: Date = new Date(), days = 14): Promise<UpcomingItem[]> {
-  const o = await getRecurringOverview(db, userId, now);
+  const o = await recurringOnce(db, userId, now);
   const until = addDays(o.today, days);
   return [...o.income, ...o.bills]
     .filter((i) => i.state !== "paused" && i.nextDate !== null && i.nextDate >= o.today && i.nextDate <= until)
@@ -77,10 +75,10 @@ export async function getNeedsAttention(db: Database, userId: string, now: Date 
   const [review, unsorted, recurring, suggestions, goals, plan] = await Promise.all([
     countNeedsReview(db, userId),
     countUnsorted(db, userId),
-    getRecurringOverview(db, userId, now),
+    recurringOnce(db, userId, now),
     listSuggestions(db, userId),
-    getGoalsOverview(db, userId, now),
-    getPlanStatus(db, userId, now),
+    goalsOnce(db, userId, now),
+    planStatusOnce(db, userId, now),
   ]);
   const items: AttentionItem[] = [];
   if (review) items.push({ key: "review", text: `${plural(review, "transaction needs", "transactions need")} a look`, href: "/transactions/review" });

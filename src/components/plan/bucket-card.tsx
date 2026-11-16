@@ -6,11 +6,11 @@ import type { BucketView } from "@/server/plan/status-service";
 import { BucketIcon } from "./plan-icons";
 
 const WEEKDAYS = ["Sunday", "Monday", "Tuesday", "Wednesday", "Thursday", "Friday", "Saturday"];
-const weekday = (iso: string) => {
+export const weekday = (iso: string) => {
   const [y, m, d] = iso.split("-").map(Number);
   return WEEKDAYS[new Date(Date.UTC(y!, m! - 1, d!)).getUTCDay()]!;
 };
-const WINDOW_WORDS = { weekly: "this week", monthly: "this month", per_income: "since your last income" } as const;
+export const WINDOW_WORDS = { weekly: "this week", monthly: "this month", per_income: "since your last income" } as const;
 const PER_WORDS = { weekly: "per week", monthly: "per month", per_income: "per income" } as const;
 
 export function BucketCard({ bucket, cadence, children }: { bucket: BucketView; cadence: PlanCadence; children?: React.ReactNode }) {

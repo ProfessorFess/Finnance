@@ -7,9 +7,6 @@ test.beforeEach(async ({ page }) => {
 });
 
 const desktopLinks = ["Home", "Transactions", "Plan", "Goals", "Recurring", "Accounts", "Import", "Settings"];
-const placeholders: [string, string, RegExp][] = [
-  ["/", "Home", /Phase 2a/],
-];
 
 test("desktop shows the sidebar and hides bottom tabs", async ({ page, isMobile }) => {
   test.skip(isMobile);
@@ -31,13 +28,6 @@ test("mobile shows bottom tabs and a More sheet", async ({ page, isMobile }) => 
   await expect(page.getByRole("dialog").getByRole("button", { name: "Sign out" })).toBeVisible();
 });
 
-for (const [path, heading, phase] of placeholders) {
-  test(`placeholder ${path} explains what's coming`, async ({ page }) => {
-    await page.goto(path);
-    await expect(page.getByRole("heading", { level: 1, name: heading })).toBeVisible();
-    await expect(page.getByText(phase)).toBeVisible();
-  });
-}
 
 test("assistant button opens the assistant sheet", async ({ page }) => {
   await page.getByRole("button", { name: "Assistant" }).first().click();
@@ -46,7 +36,7 @@ test("assistant button opens the assistant sheet", async ({ page }) => {
 
 test("has no horizontal scroll at 375px", async ({ page }) => {
   await page.setViewportSize({ width: 375, height: 812 });
-  for (const [path] of placeholders) {
+  for (const path of ["/", "/plan", "/goals", "/transactions"]) {
     await page.goto(path);
     const overflow = await page.evaluate(() => document.documentElement.scrollWidth > window.innerWidth);
     expect(overflow, path).toBe(false);

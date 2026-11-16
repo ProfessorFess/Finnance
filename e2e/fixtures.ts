@@ -24,6 +24,8 @@ export const GOALS_USER = { name: "E2E Goals", email: "goals@e2e.test", password
 export const GOALS_ORDER_USER = { name: "E2E Goals Order", email: "goals-order@e2e.test", password: "e2e-goals-order-pw-12" };
 export const GOALS_LINK_USER = { name: "E2E Goals Link", email: "goals-link@e2e.test", password: "e2e-goals-link-pw-123" };
 export const GOALS_ARCHIVE_USER = { name: "E2E Goals Archive", email: "goals-archive@e2e.test", password: "e2e-goals-archive-pw-1" };
+export const HOME_USER = { name: "E2E Home", email: "home@e2e.test", password: "e2e-home-password-1234" };
+export const SETUP_USER = { name: "E2E Setup", email: "setup@e2e.test", password: "e2e-setup-password-123" };
 export const OWNER_STATE = "e2e/.auth/owner.json";
 
 const octet = () => Math.floor(Math.random() * 254) + 1;

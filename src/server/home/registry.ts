@@ -8,8 +8,7 @@ import { z } from "zod";
 import type { WidgetSize } from "@/server/db/finance-schema";
 import type { Database } from "@/server/db/types";
 import { listTransactions } from "@/server/finance/transactions";
-import { getGoalsOverview } from "@/server/goals/overview";
-import { getPlanStatus } from "@/server/plan/status-service";
+import { goalsOnce, planStatusOnce } from "./cached";
 import { getNeedsAttention, getSpendingByCategory, getUpcoming } from "./insights";
 import { getSetupStatus } from "./setup-service";
 
@@ -52,7 +51,7 @@ export const WIDGETS = {
     settings: z.object({ bucketId: z.string().nullable().default(null) }),
     defaults: { bucketId: null },
     async load(db, userId, s, now) {
-      const plan = await getPlanStatus(db, userId, now);
+      const plan = await planStatusOnce(db, userId, now);
       if (!plan) return null;
       // The user's own limit (a bills bucket shows a computed one).
       const limited = plan.buckets.filter((b) => b.draft.limitCents !== null);
@@ -68,8 +67,8 @@ export const WIDGETS = {
     settings: empty,
     defaults: {},
     async load(db, userId, _s, now) {
-      const p = await getPlanStatus(db, userId, now);
-      return p && { cadence: p.plan.cadence, latestIncome: p.latestIncome, month: p.month, tasks: p.tasks, nextExpected: p.nextExpected, problem: p.problem };
+      const p = await planStatusOnce(db, userId, now);
+      return p && { template: p.plan.template, cadence: p.plan.cadence, latestIncome: p.latestIncome, month: p.month, tasks: p.tasks, nextExpected: p.nextExpected, problem: p.problem };
     },
   }),
   plan_overview: def({
@@ -79,7 +78,7 @@ export const WIDGETS = {
     settings: empty,
     defaults: {},
     async load(db, userId, _s, now) {
-      const p = await getPlanStatus(db, userId, now);
+      const p = await planStatusOnce(db, userId, now);
       return p && { buckets: p.buckets, health: p.health, typicalIncomeCents: p.typicalIncomeCents, cadence: p.plan.cadence };
     },
   }),
@@ -90,7 +89,7 @@ export const WIDGETS = {
     settings: z.object({ goalId: z.string().nullable().default(null), limit: z.number().int().min(1).max(10).default(3) }),
     defaults: { goalId: null, limit: 3 },
     async load(db, userId, s, now) {
-      const { goals } = await getGoalsOverview(db, userId, now);
+      const { goals } = await goalsOnce(db, userId, now);
       const one = goals.find((g) => g.id === s.goalId);
       return one ? [one] : goals.slice(0, s.limit);
     },

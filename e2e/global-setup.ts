@@ -29,6 +29,8 @@ import {
   GOALS_LINK_USER,
   GOALS_ORDER_USER,
   GOALS_USER,
+  HOME_USER,
+  SETUP_USER,
   PLAN_EDIT_USER,
   PLAN_SCRATCH_USER,
   PLAN_TWO_USER,
@@ -163,6 +165,24 @@ export default async function globalSetup() {
   for (const description of ["Haymaker", "Corner Store", "Starbucks"]) {
     await insertTestTransaction(db, sortUser.id, sortAcct.id, { amountCents: -700, date: "2026-11-10", description });
   }
+  // Home: the owner's paycheck plan and a goal.
+  const homeUser = await seeded(HOME_USER, [CHECKING]);
+  const homeSav = await createAccount(db, homeUser.id, { name: "Ally Savings", type: "savings", institution: "Ally", startingBalanceCents: 0 });
+  const homePay = await createIncomeSource(db, homeUser.id, {
+    name: "Paycheck", type: "salary", frequency: "biweekly", anchorDate: "2026-11-14", secondDay: null, amountMode: "fixed",
+    expectedCents: 120000, accountId: homeUser.accounts[0]!.id, categoryId: null, matchPattern: "Payroll Acme Corp",
+  });
+  const homeDrafts = templateDrafts("paycheck_plan", await listCategories(db, homeUser.id));
+  homeDrafts.buckets[0] = { ...homeDrafts.buckets[0]!, fundingCents: 40000, destinationAccountId: homeSav.id };
+  homeDrafts.buckets[2] = { ...homeDrafts.buckets[2]!, fundingCents: 40000, limitCents: 20000 };
+  await createPlan(db, homeUser.id, {
+    template: "paycheck_plan", cadence: "per_income", name: "Paycheck plan", incomeSourceIds: [homePay.id], buckets: homeDrafts.buckets, extraIncome: null,
+  });
+  await createGoal(db, homeUser.id, {
+    name: "Emergency fund", type: "savings", targetCents: 1000000, targetDate: null, startingCents: 0, plannedCents: null, plannedPer: null,
+    fundedByBucketId: null, trackAccountId: null, trackCategoryId: null,
+  });
+  await createOwner(auth, SETUP_USER);
   await createOwner(auth, NOSTART_USER);
   await pool.end();
 }

@@ -9,17 +9,11 @@ import { Button } from "@/components/ui/button";
 import { formatDisplayDate } from "@/lib/dates";
 import { formatCents } from "@/lib/money";
 import { cn } from "@/lib/utils";
-import type { GoalChip } from "@/server/goals/projection";
+import { GOAL_CHIPS as CHIP } from "./chips";
 import type { GoalCardView } from "./types";
 
 const ICONS: Record<string, LucideIcon> = { "piggy-bank": PiggyBank, landmark: Landmark, "shopping-bag": ShoppingBag, sunset: Sunset };
 const TYPE_LABELS = { savings: "Savings", debt_payoff: "Debt payoff", purchase: "Purchase", retirement: "Retirement" } as const;
-const CHIP: Record<GoalChip, { text: string; variant: "secondary" | "outline" | "destructive" | "default" }> = {
-  done: { text: "Done", variant: "default" },
-  ahead: { text: "Ahead", variant: "secondary" },
-  on_track: { text: "On track", variant: "secondary" },
-  behind: { text: "Behind", variant: "destructive" },
-};
 const MONTHS = ["January", "February", "March", "April", "May", "June", "July", "August", "September", "October", "November", "December"];
 const monthYear = (iso: string) => `${MONTHS[Number(iso.slice(5, 7)) - 1]} ${iso.slice(0, 4)}`;
 
