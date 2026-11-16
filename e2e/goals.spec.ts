@@ -1,5 +1,5 @@
 import { expect, test } from "@playwright/test";
-import { GOALS_LINK_USER, GOALS_ORDER_USER, GOALS_USER, signIn } from "./fixtures";
+import { GOALS_ARCHIVE_USER, GOALS_LINK_USER, GOALS_ORDER_USER, GOALS_USER, signIn } from "./fixtures";
 
 test("adds a goal and money by hand", async ({ page, isMobile }) => {
   test.skip(isMobile, "stateful flow runs on desktop");
@@ -47,4 +47,21 @@ test("counts a transaction toward a goal", async ({ page, isMobile }) => {
   await expect(page.getByRole("dialog").getByLabel("Counts toward")).toHaveValue(/.+/);
   await page.goto("/goals");
   await expect(page.getByRole("listitem").filter({ hasText: "Gift fund" }).getByText("$6.25")).toBeVisible();
+});
+
+test("archives a goal and brings it back", async ({ page, isMobile }) => {
+  test.skip(isMobile, "stateful flow runs on desktop");
+  await page.goto("/sign-in?next=/goals");
+  await signIn(page, GOALS_ARCHIVE_USER);
+  const goalsList = page.getByRole("list", { name: "Goals" });
+  await goalsList.getByRole("listitem").filter({ hasText: "Old trip" }).getByRole("button", { name: "Edit" }).click();
+  await page.getByRole("dialog").getByLabel("Status").selectOption({ label: "Archived" });
+  await page.getByRole("dialog").getByRole("button", { name: "Save" }).click();
+  await expect(goalsList).toHaveCount(0);
+  const archived = page.getByRole("region", { name: "Archived goals" });
+  await archived.getByText("Archived (1)").click();
+  await archived.getByRole("listitem").filter({ hasText: "Old trip" }).getByRole("button", { name: "Edit" }).click();
+  await page.getByRole("dialog").getByLabel("Status").selectOption({ label: "Active" });
+  await page.getByRole("dialog").getByRole("button", { name: "Save" }).click();
+  await expect(page.getByRole("list", { name: "Goals" }).getByRole("heading", { name: "Old trip" })).toBeVisible();
 });

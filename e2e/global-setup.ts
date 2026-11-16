@@ -25,6 +25,7 @@ import {
   OWNER,
   REVIEW_USER,
   REVIEW_USER_M,
+  GOALS_ARCHIVE_USER,
   GOALS_LINK_USER,
   GOALS_ORDER_USER,
   GOALS_USER,
@@ -144,6 +145,11 @@ export default async function globalSetup() {
   const goalsUser = await seeded(GOALS_USER, [CHECKING]);
   await createAccount(db, goalsUser.id, { name: "Ally Savings", type: "savings", institution: "Ally", startingBalanceCents: 0 });
   await seeded(GOALS_ORDER_USER, [CHECKING]);
+  const archiveUser = await seeded(GOALS_ARCHIVE_USER, [CHECKING]);
+  await createGoal(db, archiveUser.id, {
+    name: "Old trip", type: "purchase", targetCents: null, targetDate: null, startingCents: 0, plannedCents: null, plannedPer: null,
+    fundedByBucketId: null, trackAccountId: null, trackCategoryId: null,
+  });
   const linkUser = await seeded(GOALS_LINK_USER, [CHECKING]);
   await createGoal(db, linkUser.id, {
     name: "Gift fund", type: "savings", targetCents: null, targetDate: null, startingCents: 0, plannedCents: null, plannedPer: null,

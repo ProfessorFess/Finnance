@@ -33,7 +33,10 @@ it("shows progress only without a target", () => {
 });
 it("doesn't project without a pace", () => {
   expect(projectGoal({ ...base, targetCents: 100_000 })).toMatchObject({ paceMonthlyCents: null, projectedDate: null, chip: null, horizon: null });
-  expect(projectGoal({ ...base, targetCents: 100_000, targetDate: "2027-06-30" })).toMatchObject({ projectedDate: null, chip: "behind" });
+  // A brand-new goal with a date but no plan or history isn't "behind" on day one (spec 7.5).
+  expect(projectGoal({ ...base, targetCents: 100_000, targetDate: "2027-06-30" })).toMatchObject({ projectedDate: null, chip: null, neededMonthlyCents: 14_286 });
+  // A target date already past still reads as behind.
+  expect(projectGoal({ ...base, targetCents: 100_000, targetDate: "2026-10-31" })).toMatchObject({ chip: "behind" });
 });
 it("is done when reached or completed, and needs everything now past its date", () => {
   expect(projectGoal({ ...base, targetCents: 100_000, startingCents: 120_000 })).toMatchObject({ reached: true, chip: "done", percent: 1, projectedDate: null, remainingCents: 0 });

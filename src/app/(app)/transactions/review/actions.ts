@@ -24,6 +24,7 @@ export async function confirmCategory(id: string, categoryId: string): Promise<{
   try {
     const res = await chooseCategory(getDb(), user.id, z.string().parse(id), z.string().parse(categoryId));
     revalidatePath("/transactions");
+    revalidatePath("/goals");
     return res;
   } catch (err) {
     return toFailure(err);
@@ -36,6 +37,7 @@ export async function sortNow(): Promise<(CategorizeSummary & { transfers: numbe
   try {
     const res = await sortTransactions(getDb(), user.id, { ai: getAiCategorizer() });
     revalidatePath("/transactions");
+    revalidatePath("/goals");
     revalidatePath("/accounts");
     return res;
   } catch (err) {

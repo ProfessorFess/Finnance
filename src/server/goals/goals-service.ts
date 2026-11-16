@@ -110,7 +110,11 @@ export async function updateGoal(db: Database, userId: string, id: string, input
     const [updated] = await tx.update(goals).set(values).where(and(eq(goals.id, id), eq(goals.userId, userId))).returning();
     await logActivity(tx, { userId, actor: "user", action: "goal.update", entityType: "goal", entityId: id, before, after: updated });
   });
-  await afterGoalChange(db, userId, id);
+  // Only a change to what it counts can make past credits stop fitting; a rename or new target keeps history as is.
+  const after = await getGoal(db, userId, id);
+  const rulesChanged = before.trackAccountId !== after.trackAccountId || before.trackCategoryId !== after.trackCategoryId || before.startDate !== after.startDate;
+  if (rulesChanged) await afterGoalChange(db, userId, id);
+  else await afterGoalMove(db, userId);
   return getGoal(db, userId, id);
 }
 

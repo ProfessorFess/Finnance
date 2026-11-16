@@ -3,6 +3,7 @@ import { categories, categoryRules, transactions } from "@/server/db/schema";
 import type { Database } from "@/server/db/types";
 import { NotFoundError } from "@/server/finance/errors";
 import { type TransactionRow, updateTransaction } from "@/server/finance/transactions";
+import { refreshGoals } from "@/server/goals/credit-service";
 import { applyRuleToExisting, createRule } from "./rules-service";
 
 export type Learned =
@@ -23,7 +24,7 @@ async function categoryName(db: Database, userId: string, categoryId: string): P
  * Finnance learns from it: the first time for a merchant it offers a rule; the
  * second time it creates the rule itself and applies it to similar rows.
  */
-export async function chooseCategory(
+async function chooseCategoryCore(
   db: Database,
   userId: string,
   transactionId: string,
@@ -60,6 +61,21 @@ export async function chooseCategory(
   return { row, learned: { kind: "suggest", merchant: row.merchant, categoryId, categoryName: name } };
 }
 
+/**
+ * The user picks a category for one transaction. It becomes their choice, and
+ * Finnance learns from it; goals that count that category update too.
+ */
+export async function chooseCategory(
+  db: Database,
+  userId: string,
+  transactionId: string,
+  categoryId: string | null,
+): Promise<{ row: TransactionRow; learned: Learned | null }> {
+  const result = await chooseCategoryCore(db, userId, transactionId, categoryId);
+  await refreshGoals(db, userId);
+  return result;
+}
+
 /** "Always put this merchant in this category": a rule, applied to matching automatic rows. */
 export async function alwaysCategorize(
   db: Database,
@@ -72,5 +88,7 @@ export async function alwaysCategorize(
     categoryId: input.categoryId,
     createdFrom: "user",
   });
-  return { ruleId: rule.id, applied: await applyRuleToExisting(db, userId, rule.id) };
+  const applied = await applyRuleToExisting(db, userId, rule.id);
+  await refreshGoals(db, userId);
+  return { ruleId: rule.id, applied };
 }

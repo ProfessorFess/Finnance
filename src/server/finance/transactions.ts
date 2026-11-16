@@ -18,6 +18,7 @@ import { type ActivityEntry, listActivity, logActivity } from "./activity";
 import { NotFoundError, ValidationError } from "./errors";
 import { categorizeTransactions } from "@/server/categorize/pipeline";
 import { clearDanglingPairs } from "@/server/categorize/transfers-service";
+import { refreshGoals } from "@/server/goals/credit-service";
 import { NOT_A_TRANSFER } from "@/lib/transfer-constants";
 import { getTrackingStartDate } from "./settings";
 
@@ -258,11 +259,10 @@ export async function createManualTransaction(
   });
   // Sort a new entry right away with rules and past choices (no AI for one row);
   // anything they can't place goes to review instead of waiting for "Sort now".
-  if (!input.categoryId) {
-    await categorizeTransactions(db, userId, { ids: [created.id] }, { ai: null });
-    return toRow(await getRow(db, userId, created.id));
-  }
-  return created;
+  if (!input.categoryId) await categorizeTransactions(db, userId, { ids: [created.id] }, { ai: null });
+  // A new entry can count toward a goal that tracks its category.
+  await refreshGoals(db, userId);
+  return toRow(await getRow(db, userId, created.id));
 }
 
 /** Edits a transaction. Imported rows keep the bank's date and amount. */
@@ -355,6 +355,7 @@ export async function setCategoryBulk(
       })),
     );
   });
+  await refreshGoals(db, userId);
   return changed.length;
 }
 

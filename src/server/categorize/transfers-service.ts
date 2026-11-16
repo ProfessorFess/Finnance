@@ -5,6 +5,7 @@ import type { Database, Executor } from "@/server/db/types";
 import { logActivity } from "@/server/finance/activity";
 import { listCategories } from "@/server/finance/categories";
 import { NotFoundError } from "@/server/finance/errors";
+import { refreshGoals } from "@/server/goals/credit-service";
 import { pairTransfers } from "./transfers";
 
 const shiftDays = (iso: string, days: number) => {
@@ -118,6 +119,8 @@ export async function unpairTransfer(db: Database, userId: string, transactionId
       await logActivity(tx, { userId, actor: "user", action: "transaction.transfer_unpair", entityType: "transaction", entityId: id, before: { transferPairId: row.pairId } });
     }
   });
+  // Money that only counted toward a goal as a transfer no longer does.
+  await refreshGoals(db, userId);
 }
 
 /**

@@ -13,6 +13,7 @@ import type { BucketOption, GoalCardView, Option } from "./types";
 
 export function GoalsBoard({
   goals,
+  archived,
   totalSavedCents,
   today,
   defaultStartDate,
@@ -21,6 +22,7 @@ export function GoalsBoard({
   buckets,
 }: {
   goals: GoalCardView[];
+  archived: GoalCardView[];
   totalSavedCents: number;
   today: string;
   defaultStartDate: string;
@@ -63,6 +65,18 @@ export function GoalsBoard({
             />
           ))}
         </ul>
+      )}
+      {archived.length > 0 && (
+        <section aria-label="Archived goals" className="mt-8">
+          <details>
+            <summary className="cursor-pointer text-sm font-medium text-muted-foreground">Archived ({archived.length})</summary>
+            <ul className="mt-3 flex flex-col gap-3">
+              {archived.map((g) => (
+                <GoalCard key={g.id} goal={g} first last onEdit={() => setEditing({ open: true, goal: g })} onAddMoney={() => setAdding(g)} onMove={() => undefined} />
+              ))}
+            </ul>
+          </details>
+        </section>
       )}
       <GoalDialog
         open={editing.open}

@@ -69,6 +69,7 @@ export default async function GoalsPage() {
       <PageHeader title="Goals" description="What you're saving toward, in order." />
       <GoalsBoard
         goals={overview.goals.map(cardOf)}
+        archived={overview.archived.map(cardOf)}
         totalSavedCents={overview.totalSavedCents}
         today={overview.today}
         defaultStartDate={settings.trackingStartDate}

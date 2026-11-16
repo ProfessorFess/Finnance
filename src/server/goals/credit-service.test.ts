@@ -11,7 +11,7 @@ import { commitImport, undoImport } from "@/server/import/service";
 import { createTestDb } from "@/test/db";
 import { fixtureBytes } from "@/test/fixtures";
 import { createTestUser, insertTestTransaction } from "@/test/users";
-import { creditGoals, linkTransactionToGoal, regoal, setContributionCounted } from "./credit-service";
+import { creditGoals, linkTransactionToGoal, refreshGoals, regoal, setContributionCounted } from "./credit-service";
 import { createGoal, type GoalInput, listContributions, setGoalStatus, updateGoal } from "./goals-service";
 
 let t: Awaited<ReturnType<typeof createTestDb>>;
@@ -164,4 +164,71 @@ it("isolates users", async () => {
   const bRow = await insertTestTransaction(t.db, B, bAcct.id, { amountCents: -100, date: "2026-11-20" });
   await expect(linkTransactionToGoal(t.db, B, bRow.id, emergency.id)).rejects.toThrow(NotFoundError);
   expect(await t.db.select().from(goalContributions).where(and(eq(goalContributions.userId, B)))).toEqual([]);
+});
+
+it("editing a done or paused goal keeps its history", async () => {
+  const emergency = await createGoal(t.db, A, goal());
+  const vacation = await createGoal(t.db, A, goal({ name: "Vacation" }));
+  await pair("2026-11-13", 50_000);
+  await creditGoals(t.db, A);
+  await setGoalStatus(t.db, A, emergency.id, "completed");
+  await updateGoal(t.db, A, emergency.id, goal({ name: "Emergency fund (done)" }));
+  expect(await amounts(emergency.id)).toEqual([50_000]);
+  expect(await amounts(vacation.id)).toEqual([]);
+  // Reopening keeps it too.
+  await setGoalStatus(t.db, A, emergency.id, "active");
+  expect(await amounts(emergency.id)).toEqual([50_000]);
+  // A paused goal renamed keeps its money.
+  await setGoalStatus(t.db, A, emergency.id, "paused");
+  await updateGoal(t.db, A, emergency.id, goal({ name: "Emergency fund" }));
+  expect(await amounts(emergency.id)).toEqual([50_000]);
+});
+
+it("changing what a goal counts drops only credits that no longer fit", async () => {
+  const other = await createAccount(t.db, A, { name: "Other savings", type: "savings", startingBalanceCents: 0 });
+  const emergency = await createGoal(t.db, A, goal());
+  await pair("2026-11-13", 40_000);
+  await creditGoals(t.db, A);
+  await pair("2026-11-20", 25_000, A, checking, other);
+  await updateGoal(t.db, A, emergency.id, goal({ trackAccountId: other.id }));
+  expect(await amounts(emergency.id)).toEqual([25_000]);
+});
+
+it("a transfer counts once even when either side is linked", async () => {
+  const emergency = await createGoal(t.db, A, goal());
+  const inn = await pair("2026-11-13", 40_000);
+  await creditGoals(t.db, A);
+  const [out] = await t.db.select().from(transactions).where(and(eq(transactions.userId, A), eq(transactions.amountCents, -40_000)));
+  await linkTransactionToGoal(t.db, A, out!.id, emergency.id);
+  expect(await amounts(emergency.id)).toEqual([40_000]);
+  // The other order: link the checking side first, then crediting must skip the savings side.
+  const second = await pair("2026-11-20", 30_000);
+  const [out2] = await t.db.select().from(transactions).where(and(eq(transactions.userId, A), eq(transactions.amountCents, -30_000)));
+  await linkTransactionToGoal(t.db, A, out2!.id, emergency.id);
+  await creditGoals(t.db, A);
+  expect((await amounts(emergency.id)).sort()).toEqual([30_000, 40_000]);
+  void inn;
+  void second;
+});
+
+it("recategorizing or un-pairing takes money back off a goal", async () => {
+  const cats = await listCategories(t.db, A);
+  const investing = cats.find((c) => c.name === "Investing")!;
+  const gifts = cats.find((c) => c.name === "Gifts")!;
+  const roth = await createGoal(t.db, A, goal({ name: "Roth IRA", trackAccountId: null, trackCategoryId: investing.id }));
+  const ira = await insertTestTransaction(t.db, A, checking.id, { amountCents: -50_000, date: "2026-11-20", description: "Brokerage" });
+  await t.db.update(transactions).set({ categoryId: investing.id }).where(eq(transactions.id, ira.id));
+  await refreshGoals(t.db, A);
+  expect(await amounts(roth.id)).toEqual([50_000]);
+  await t.db.update(transactions).set({ categoryId: gifts.id }).where(eq(transactions.id, ira.id));
+  await refreshGoals(t.db, A);
+  expect(await amounts(roth.id)).toEqual([]);
+
+  const emergency = await createGoal(t.db, A, goal());
+  const inn = await pair("2026-11-13", 40_000);
+  await refreshGoals(t.db, A);
+  expect(await amounts(emergency.id)).toEqual([40_000]);
+  await t.db.update(transactions).set({ transferPairId: "none" }).where(eq(transactions.id, inn.id));
+  await refreshGoals(t.db, A);
+  expect(await amounts(emergency.id)).toEqual([]);
 });

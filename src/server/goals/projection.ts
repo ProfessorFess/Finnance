@@ -72,7 +72,9 @@ export function projectGoal(input: ProjectionInput): Projection {
   if (reached || input.completed) chip = "done";
   else if (targetCents === null) chip = null;
   else if (targetDate) {
-    if (!projectedDate) chip = "behind";
+    // A target date already past is behind; with no pace yet (a new goal), there's nothing to judge.
+    if (targetDate < today) chip = "behind";
+    else if (!projectedDate) chip = paceMonthlyCents === null ? null : "behind";
     else if (projectedDate <= addMonths(targetDate, -1)) chip = "ahead";
     else if (projectedDate <= targetDate) chip = "on_track";
     else chip = "behind";

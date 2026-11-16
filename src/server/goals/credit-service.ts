@@ -56,9 +56,13 @@ export async function creditGoals(db: Database, userId: string): Promise<number>
     .where(and(eq(transactions.userId, userId), ne(transactions.status, "excluded"), gte(transactions.date, earliest), isNull(goalContributions.id), or(...fits)))
     .orderBy(asc(transactions.date), asc(transactions.id));
 
+  // A transfer is one movement of money: if either side already counts, the other doesn't.
+  const countedPairs = await pairsWithContributions(db, userId);
+
   let credited = 0;
   await db.transaction(async (tx) => {
     for (const c of candidates) {
+      if (isTransfer(c) && countedPairs.has(c.pairId!)) continue;
       for (const g of active) {
         const amount = fit(g, c);
         if (amount === null) continue;
@@ -69,6 +73,7 @@ export async function creditGoals(db: Database, userId: string): Promise<number>
           .returning({ id: goalContributions.id });
         if (inserted.length) {
           credited++;
+          if (isTransfer(c)) countedPairs.add(c.pairId!);
           await tx.insert(activityLog).values({ userId, actor: "system", action: "goal_contribution.auto", entityType: "goal", entityId: g.id, after: { transactionId: c.id, amountCents: amount } });
         }
         break;
@@ -78,11 +83,65 @@ export async function creditGoals(db: Database, userId: string): Promise<number>
   return credited;
 }
 
-/** Re-credits one goal from scratch after its settings changed: drops its automatic credits (not the user's choices), then credits again. */
+async function pairsWithContributions(db: Database, userId: string): Promise<Set<string>> {
+  const rows = await db
+    .select({ pairId: transactions.transferPairId })
+    .from(goalContributions)
+    .innerJoin(transactions, eq(transactions.id, goalContributions.transactionId))
+    .where(and(eq(goalContributions.userId, userId), sql`${transactions.transferPairId} is not null`, ne(transactions.transferPairId, NOT_A_TRANSFER)));
+  return new Set(rows.map((r) => r.pairId!));
+}
+
+/**
+ * Drops automatic credits that no longer fit their goal (its account or
+ * category changed, the transaction was recategorized or un-paired, or its
+ * start date moved). The user's own choices (links, "doesn't count") stay.
+ */
+export async function pruneCredits(db: Database, userId: string, scope: { goalId?: string } = {}): Promise<number> {
+  const rows = await db
+    .select({
+      contributionId: goalContributions.id,
+      goal: goals,
+      id: transactions.id,
+      date: transactions.date,
+      amountCents: transactions.amountCents,
+      accountId: transactions.accountId,
+      categoryId: transactions.categoryId,
+      pairId: transactions.transferPairId,
+    })
+    .from(goalContributions)
+    .innerJoin(goals, eq(goals.id, goalContributions.goalId))
+    .innerJoin(transactions, eq(transactions.id, goalContributions.transactionId))
+    .where(
+      and(
+        eq(goalContributions.userId, userId),
+        eq(goalContributions.source, "auto"),
+        eq(goalContributions.excluded, false),
+        ...(scope.goalId ? [eq(goalContributions.goalId, scope.goalId)] : []),
+      ),
+    );
+  const stale = rows.filter((r) => fit(r.goal, r) === null).map((r) => r.contributionId);
+  if (stale.length === 0) return 0;
+  await db.transaction(async (tx) => {
+    await tx.delete(goalContributions).where(and(eq(goalContributions.userId, userId), inArray(goalContributions.id, stale)));
+    await tx.insert(activityLog).values(
+      rows
+        .filter((r) => stale.includes(r.contributionId))
+        .map((r) => ({ userId, actor: "system" as const, action: "goal_contribution.unfit", entityType: "goal", entityId: r.goal.id, before: { transactionId: r.id } })),
+    );
+  });
+  return stale.length;
+}
+
+/** After a goal's counting rules change: drop its credits that no longer fit, then credit what does. History that still fits stays put. */
 export async function regoal(db: Database, userId: string, goalId: string): Promise<number> {
-  await db
-    .delete(goalContributions)
-    .where(and(eq(goalContributions.userId, userId), eq(goalContributions.goalId, goalId), eq(goalContributions.source, "auto"), eq(goalContributions.excluded, false)));
+  await pruneCredits(db, userId, { goalId });
+  return creditGoals(db, userId);
+}
+
+/** After transactions change (recategorized, un-paired, added): take off what no longer fits, then credit what does. */
+export async function refreshGoals(db: Database, userId: string): Promise<number> {
+  await pruneCredits(db, userId);
   return creditGoals(db, userId);
 }
 
@@ -113,7 +172,21 @@ export async function linkTransactionToGoal(db: Database, userId: string, transa
     if (!g) throw new NotFoundError("Goal");
   }
   const [existing] = await db.select().from(goalContributions).where(and(eq(goalContributions.transactionId, row.id), eq(goalContributions.userId, userId)));
+  // The other side of a transfer is the same money: it can't count separately.
+  const partners = isTransfer(row)
+    ? (
+        await db
+          .select({ id: transactions.id })
+          .from(transactions)
+          .where(and(eq(transactions.userId, userId), eq(transactions.transferPairId, row.pairId!), ne(transactions.id, row.id)))
+      ).map((p) => p.id)
+    : [];
   await db.transaction(async (tx) => {
+    if (partners.length) {
+      const partnerFilter = and(eq(goalContributions.userId, userId), inArray(goalContributions.transactionId, partners));
+      if (goalId) await tx.delete(goalContributions).where(partnerFilter);
+      else await tx.update(goalContributions).set({ excluded: true }).where(partnerFilter);
+    }
     if (goalId) {
       if (existing) await tx.delete(goalContributions).where(eq(goalContributions.id, existing.id));
       await tx.insert(goalContributions).values({ userId, goalId, date: row.date, amountCents: Math.abs(row.amountCents), transactionId: row.id, source: "linked" });

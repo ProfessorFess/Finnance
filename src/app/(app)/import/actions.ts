@@ -69,6 +69,7 @@ export async function importFile(formData: FormData): Promise<ImportResult | Fai
     }, { ai: getAiCategorizer() });
     revalidatePath("/import");
     revalidatePath("/transactions");
+    revalidatePath("/goals");
     revalidatePath("/accounts");
     return result;
   } catch (err) {
@@ -84,6 +85,7 @@ export async function undoBatch(batchId: string): Promise<{ removed: number } | 
     const res = await undoImport(getDb(), user.id, z.string().parse(batchId));
     revalidatePath("/import");
     revalidatePath("/transactions");
+    revalidatePath("/goals");
     revalidatePath("/accounts");
     return res;
   } catch (err) {

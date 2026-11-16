@@ -10,7 +10,7 @@ import { getDb } from "@/server/db/client";
 import { NotFoundError, ValidationError } from "@/server/finance/errors";
 import type { ItemRef } from "@/server/recurring/items-service";
 import { linkTransaction } from "@/server/recurring/matching-service";
-import { creditGoals, linkTransactionToGoal } from "@/server/goals/credit-service";
+import { linkTransactionToGoal } from "@/server/goals/credit-service";
 import {
   createManualTransaction,
   deleteTransaction,
@@ -55,8 +55,6 @@ export async function setCategory(id: string, categoryId: string | null): Promis
   const user = await requireUser();
   try {
     const res = await chooseCategory(getDb(), user.id, z.string().parse(id), z.string().nullable().parse(categoryId));
-    // A new category can make it count toward a goal that tracks that category.
-    await creditGoals(getDb(), user.id);
     revalidatePath("/transactions");
     revalidatePath("/goals");
     return res;
@@ -73,6 +71,7 @@ export async function alwaysCategorizeAction(merchant: string, categoryId: strin
       categoryId: z.string().parse(categoryId),
     });
     revalidatePath("/transactions");
+    revalidatePath("/goals");
     return { applied };
   } catch (err) {
     return toFailure(err);
@@ -84,6 +83,7 @@ export async function notATransferAction(id: string): Promise<{ ok: true } | Fai
   try {
     await unpairTransfer(getDb(), user.id, z.string().parse(id));
     revalidatePath("/transactions");
+    revalidatePath("/goals");
     return { ok: true };
   } catch (err) {
     return toFailure(err);
@@ -94,7 +94,6 @@ export async function bulkCategorize(ids: string[], categoryId: string | null): 
   const user = await requireUser();
   try {
     const changed = await setCategoryBulk(getDb(), user.id, z.array(z.string()).max(1000).parse(ids), z.string().nullable().parse(categoryId));
-    await creditGoals(getDb(), user.id);
     revalidatePath("/transactions");
     revalidatePath("/goals");
     return { changed };
@@ -124,6 +123,7 @@ export async function addTransaction(formData: FormData): Promise<TransactionRow
       amountCents: input.direction === "out" ? -cents : cents,
     });
     revalidatePath("/transactions");
+    revalidatePath("/goals");
     revalidatePath("/accounts");
     return row;
   } catch (err) {
@@ -136,6 +136,7 @@ export async function saveNotes(id: string, notes: string): Promise<TransactionR
   try {
     const row = await updateTransaction(getDb(), user.id, z.string().parse(id), { notes: z.string().max(2000).parse(notes) });
     revalidatePath("/transactions");
+    revalidatePath("/goals");
     return row;
   } catch (err) {
     return toFailure(err);
@@ -147,6 +148,7 @@ export async function setHiddenAction(id: string, hidden: boolean): Promise<Tran
   try {
     const row = await setHidden(getDb(), user.id, z.string().parse(id), z.boolean().parse(hidden));
     revalidatePath("/transactions");
+    revalidatePath("/goals");
     revalidatePath("/accounts");
     return row;
   } catch (err) {
@@ -159,6 +161,7 @@ export async function removeTransaction(id: string): Promise<{ ok: true } | Fail
   try {
     await deleteTransaction(getDb(), user.id, z.string().parse(id));
     revalidatePath("/transactions");
+    revalidatePath("/goals");
     revalidatePath("/accounts");
     return { ok: true };
   } catch (err) {
@@ -215,6 +218,7 @@ export async function linkRecurringAction(transactionId: string, ref: ItemRef | 
     const id = z.string().min(1).parse(transactionId);
     await linkTransaction(getDb(), user.id, id, refSchema.parse(ref));
     revalidatePath("/transactions");
+    revalidatePath("/goals");
     revalidatePath("/recurring");
     return { row: await getTransactionRow(getDb(), user.id, id) };
   } catch (err) {
